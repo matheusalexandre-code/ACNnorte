@@ -29,8 +29,9 @@ def _rule_bodies(css: str, token: str):
     ]
 
 
-def test_page_config_starts_sidebar_automatically():
-    assert PAGE_CONFIG["initial_sidebar_state"] == "auto"
+def test_page_config_expands_sidebar_on_start():
+    assert PAGE_CONFIG["initial_sidebar_state"] == "expanded"
+    assert PAGE_CONFIG["page_title"] == "ACNnorte"
     assert PAGE_CONFIG["layout"] == "wide"
 
 
@@ -154,11 +155,12 @@ def test_sidebar_state_survives_page_navigation():
 @pytest.mark.parametrize(
     "page",
     [
-        "Painel Inicial",
+        "Dashboard",
         "Clientes",
-        "Visitas Técnicas",
+        "Nova Visita",
+        "Histórico de Visitas",
         "Fotografias",
-        "Relatórios & Exportação",
+        "Relatórios",
         "Alterar Senha",
         "Gerenciar Usuários",
     ],

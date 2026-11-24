@@ -7,7 +7,9 @@ Aplicativo modular desenvolvido em Python para gestão de visitas técnicas de s
 O projeto segue uma arquitetura modular baseada em responsabilidades:
 
 - `src/`: Aplicação Streamlit (ponto de entrada, autenticação, navegação, armazenamento e exportações).
-  - `views/`: Telas da aplicação (login, painel, clientes, visitas, fotografias, relatórios e administração).
+  - `views/`: Telas da aplicação (login, dashboard, clientes, nova visita, histórico, fotografias, relatórios e administração). O menu lateral usa os rótulos **Dashboard**, **Nova Visita**, **Histórico de Visitas** e **Relatórios**.
+  - `checklist_sst.py`: Checklist modular de Segurança do Trabalho (14 categorias, respostas Conforme / Não conforme / Não aplicável).
+  - `storage_bridge.py`: Espelhamento não destrutivo de fotografias, relatórios e exportações para `storage/photos`, `storage/reports` e `storage/exports`.
   - `features/visit_enhancements/`: Blocos modulares reutilizáveis de visitas (temperatura, assinaturas, equipamentos, fluxo do formulário, fotografias, relatórios e integração). Registrados em `src/features/__init__.py` e inicializados pelo `src/main.py`; acessíveis na tela de preenchimento de visitas em modo consulta.
   - `modules/authentication/`: Camada de autenticação integrada ao Xano e contas locais.
   - `core/database/`: Cliente HTTP e integração com Xano.

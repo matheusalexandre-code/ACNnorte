@@ -6,6 +6,13 @@ from functools import partial
 
 import streamlit as st
 
+from src.checklist_sst import (
+    SST_CATEGORIES,
+    SST_OPTIONS,
+    SST_UNANSWERED,
+    build_sst_answers,
+    sst_widget_key,
+)
 from src.equipment_catalog import equipment_grouped, equipment_label
 from src.features.visit_enhancements.integration import (
     finalize_visit_guard,
@@ -27,7 +34,9 @@ from src.signature_pad import (
 from src.storage_manager import (
     SIGNATURE_LABELS,
     SIGNATURE_ROLES,
+    VISIT_STATUSES,
     add_client,
+    add_photo_to_visit,
     add_visit,
     get_caderno_avaliacao,
     get_visit_equipment,
@@ -546,8 +555,8 @@ def _render_visits_overview(visits: dict, clients: dict):
 # ---------------------------------------------------------------------------
 def _render_new_visit(clients: dict):
     render_section_title(
-        "Iniciar nova visita técnica",
-        "Crie uma nova visita vinculada à empresa selecionada e identifique data, funcionário e horário.",
+        "Cadastro de nova visita técnica",
+        "Preencha os dados da empresa, da visita, do checklist de Segurança do Trabalho e das fotografias.",
         "➕",
     )
 
@@ -572,55 +581,191 @@ def _render_new_visit(clients: dict):
         default_index = ids.index(preselected)
 
     with st.form("new_visit_form"):
+        st.markdown("#### 1. Dados da empresa")
         selected_client_label = st.selectbox(
             "Empresa cliente *",
             labels,
             index=default_index,
             key="new_visit_empresa_cliente",
         )
+        current_client = clients.get(client_options[selected_client_label], {})
+        cnpj_col, responsible_col = st.columns(2)
+        with cnpj_col:
+            cnpj = st.text_input("CNPJ", value=str(current_client.get("cnpj", "")))
+        with responsible_col:
+            responsible = st.text_input(
+                "Nome do responsável pela empresa",
+                value=str(current_client.get("responsible", "")),
+            )
+        address = st.text_input("Endereço", value=str(current_client.get("address", "")))
+        city_col, state_col, segment_col = st.columns(3)
+        with city_col:
+            city = st.text_input("Cidade")
+        with state_col:
+            state = st.text_input("Estado/UF", max_chars=2)
+        with segment_col:
+            segment = st.text_input("Segmento de atividade")
+
+        st.markdown("#### 2. Dados da visita")
         technician_name = st.text_input(
             "Técnico/Avaliador responsável *",
             value=st.session_state.get("username", "Eng. Técnico"),
         )
-        worker_name = st.text_input("Funcionário (identificação da visita)", placeholder="Nome do funcionário")
+        worker_name = st.text_input(
+            "Funcionário (identificação da visita)", placeholder="Nome do funcionário"
+        )
         col1, col2, col3 = st.columns(3)
         with col1:
-            visit_start = st.date_input("Data da visita *", value=date.today(), key="new_visit_data_visita")
+            visit_start = st.date_input(
+                "Data da visita *", value=date.today(), key="new_visit_data_visita"
+            )
         with col2:
             visit_time = st.time_input(
-                "Horário",
+                "Horário de início",
                 value=time(hour=datetime.now().hour, minute=datetime.now().minute),
                 key="new_visit_horario",
             )
         with col3:
-            visit_end = st.date_input("Data de término", value=date.today(), key="new_visit_data_termino")
+            visit_end = st.date_input(
+                "Data de término", value=date.today(), key="new_visit_data_termino"
+            )
+        type_col, status_col = st.columns(2)
+        with type_col:
+            visit_type = st.selectbox(
+                "Tipo de visita",
+                [
+                    "",
+                    "Visita de rotina",
+                    "Inspeção",
+                    "Auditoria",
+                    "Atendimento de ocorrência",
+                    "Outro",
+                ],
+                key="new_visit_tipo",
+            )
+        with status_col:
+            status = st.selectbox(
+                "Status da visita",
+                list(VISIT_STATUSES),
+                index=list(VISIT_STATUSES).index("Em Andamento"),
+                key="new_visit_status",
+            )
+        objective = st.text_area("Objetivo da visita", key="new_visit_objetivo")
 
-        submitted = st.form_submit_button("Iniciar visita", type="primary", width="stretch")
+        st.markdown("#### 3. Checklist de Segurança do Trabalho")
+        st.caption(
+            "Checklist de apoio organizado por categoria. Não substitui avaliação profissional "
+            "nem o cumprimento das normas oficiais aplicáveis."
+        )
+        sst_answers = {}
+        for category_key, category in SST_CATEGORIES.items():
+            with st.expander(f"{category['icon']} {category['title']}"):
+                for item in category["items"]:
+                    key = sst_widget_key("new", category_key, item["id"])
+                    sst_answers[key] = st.selectbox(
+                        item["label"],
+                        [SST_UNANSWERED, *SST_OPTIONS],
+                        key=key,
+                    )
+
+        st.markdown("#### 4. Observações técnicas")
+        obs_general = st.text_area("Observações gerais", key="new_visit_obs_geral")
+        obs_risks = st.text_area("Riscos identificados", key="new_visit_obs_riscos")
+        obs_nonconformities = st.text_area(
+            "Não conformidades", key="new_visit_obs_nao_conformidades"
+        )
+        obs_recommendations = st.text_area(
+            "Recomendações", key="new_visit_obs_recomendacoes"
+        )
+        obs_actions = st.text_area("Ações necessárias", key="new_visit_obs_acoes")
+        obs_deadline = st.text_input(
+            "Prazo recomendado para adequação", key="new_visit_obs_prazo"
+        )
+
+        st.markdown("#### 5. Fotografias")
+        uploaded_photos = st.file_uploader(
+            "Envie fotografias da visita (PNG/JPG/JPEG, até 10 MB por arquivo)",
+            type=["png", "jpg", "jpeg"],
+            accept_multiple_files=True,
+            key="new_visit_fotos",
+        )
+        if uploaded_photos:
+            st.caption(f"{len(uploaded_photos)} arquivo(s) selecionado(s) para anexar.")
+
+        submitted = st.form_submit_button("Salvar visita", type="primary", width="stretch")
         if submitted:
+            errors = []
             if not technician_name.strip():
-                st.error("Informe o nome do técnico/avaliador responsável para iniciar a visita.")
+                errors.append("Informe o nome do técnico/avaliador responsável.")
+            if visit_end and visit_start and visit_end < visit_start:
+                errors.append("A data de término não pode ser anterior à data da visita.")
+            cnpj_digits = "".join(filter(str.isdigit, str(cnpj or "")))
+            if cnpj_digits and len(cnpj_digits) != 14:
+                errors.append("Informe um CNPJ com 14 dígitos ou deixe o campo vazio.")
+            if errors:
+                for error in errors:
+                    st.error(error)
             else:
                 end_str = str(visit_end) if visit_end else str(visit_start)
-                with st.spinner("Criando visita..."):
-                    success, visit_id, _message = add_visit(
+                with st.spinner("Salvando visita..."):
+                    success, visit_id, message = add_visit(
                         client_options[selected_client_label],
                         technician_name.strip(),
                         str(visit_start),
-                        status="Em Andamento",
+                        status=status,
                         worker_name=worker_name.strip(),
                         date_start=str(visit_start),
                         date_end=end_str,
                         horario=visit_time.strftime("%H:%M") if visit_time else "",
+                        visit_type=visit_type.strip(),
+                        objective=objective.strip(),
+                        company_details={
+                            "cnpj": cnpj.strip(),
+                            "responsible": responsible.strip(),
+                            "address": address.strip(),
+                            "city": city.strip(),
+                            "state": state.strip().upper(),
+                            "segment": segment.strip(),
+                        },
+                        sst_checklist=build_sst_answers("new", sst_answers),
+                        technical_observations={
+                            "general": obs_general.strip(),
+                            "risks": obs_risks.strip(),
+                            "non_conformities": obs_nonconformities.strip(),
+                            "recommendations": obs_recommendations.strip(),
+                            "actions": obs_actions.strip(),
+                            "deadline": obs_deadline.strip(),
+                        },
                     )
-                if success:
+                if not success:
+                    st.error(
+                        f"Falha de persistência: {message}"
+                        if message
+                        else "Não foi possível salvar a visita. Verifique os dados e tente novamente."
+                    )
+                else:
+                    photo_errors = []
+                    for upload in uploaded_photos or []:
+                        photo_ok, photo_message = add_photo_to_visit(
+                            visit_id,
+                            upload.getvalue(),
+                            upload.name,
+                            f"Fotografia anexada no cadastro: {upload.name}",
+                            validate_photo=True,
+                        )
+                        if not photo_ok:
+                            photo_errors.append(f"{upload.name}: {photo_message}")
+                    if photo_errors:
+                        st.warning(
+                            "Visita salva, mas algumas fotografias foram rejeitadas: "
+                            + "; ".join(photo_errors)
+                        )
                     st.session_state.pop("new_visit_client_id", None)
                     st.session_state["active_visit_id"] = visit_id
                     st.session_state[_step_key(visit_id)] = FILL_STEP_IDENTIFICACAO
                     record_sync()
-                    set_flash("Visita iniciada com sucesso! Continue pelo caderno de avaliação.")
+                    set_flash("Visita salva com sucesso! Continue pelo caderno de avaliação.")
                     navigate_to(PAGE_VISITS, visits_tab=VISITS_TAB_FILL)
-                else:
-                    st.error("Não foi possível iniciar a visita. Verifique os dados e tente novamente.")
 
 
 # ---------------------------------------------------------------------------

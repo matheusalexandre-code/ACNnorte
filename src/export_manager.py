@@ -579,6 +579,13 @@ def generate_pdf_report(visit_id: str) -> str:
     story.append(KeepTogether([t_signatures]))
 
     doc.build(story)
+    # Cópia em storage/reports sem alterar o caminho oficial em data/exports.
+    try:
+        from src.storage_bridge import mirror_file
+
+        mirror_file(pdf_path, "reports")
+    except Exception:
+        pass
     return pdf_path
 
 def export_clients_to_excel() -> str:
@@ -604,6 +611,12 @@ def export_clients_to_excel() -> str:
     filename = f"Clientes_ACNnorte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     filepath = os.path.join(EXPORTS_DIR, filename)
     df.to_excel(filepath, index=False)
+    try:
+        from src.storage_bridge import mirror_file
+
+        mirror_file(filepath, "exports")
+    except Exception:
+        pass
     return filepath
 
 def export_visits_to_excel() -> str:
@@ -714,4 +727,10 @@ def export_visits_to_excel() -> str:
     filename = f"Visitas_Tecnicas_ACNnorte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     filepath = os.path.join(EXPORTS_DIR, filename)
     df.to_excel(filepath, index=False)
+    try:
+        from src.storage_bridge import mirror_file
+
+        mirror_file(filepath, "exports")
+    except Exception:
+        pass
     return filepath

@@ -9,11 +9,12 @@ from streamlit.testing.v1 import AppTest
 MAIN_SCRIPT = str(Path(__file__).resolve().parents[1] / "src" / "main.py")
 
 PAGES = [
-    "Painel Inicial",
+    "Dashboard",
     "Clientes",
-    "Visitas Técnicas",
+    "Nova Visita",
+    "Histórico de Visitas",
     "Fotografias",
-    "Relatórios & Exportação",
+    "Relatórios",
     "Alterar Senha",
     "Gerenciar Usuários",
 ]
@@ -33,7 +34,7 @@ def test_app_opens_directly_on_main_screen_without_login(monkeypatch):
     app.run()
     assert not app.exception, [error.value for error in app.exception]
     assert app.session_state["authenticated"] is True
-    assert app.session_state["current_page"] == "Painel Inicial"
+    assert app.session_state["current_page"] == "Dashboard"
     labels = [widget.label for widget in app.text_input]
     assert "Senha" not in labels
     assert "E-mail ou usuário" not in labels

@@ -295,7 +295,7 @@ def _render_consult(clients: dict, visits: dict):
     st.markdown("#### Histórico de visitas técnicas")
     client_visits = [v for v in visits.values() if v.get("client_id") == selected_id]
     if not client_visits:
-        render_empty_state("📋", "Nenhuma visita registrada", "Inicie uma visita na aba Clientes ou em Visitas Técnicas.")
+        render_empty_state("📋", "Nenhuma visita registrada", "Inicie uma visita em Nova Visita ou pelo cadastro do cliente.")
         return
 
     client_visits.sort(key=lambda v: v.get("date", ""), reverse=True)

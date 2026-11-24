@@ -45,18 +45,20 @@ LOGO_WIDTH_PRESETS = {
 # ---------------------------------------------------------------------------
 # Chaves de navegação (compartilhadas entre main, views e atalhos)
 # ---------------------------------------------------------------------------
-PAGE_DASHBOARD = "Painel Inicial"
+PAGE_DASHBOARD = "Dashboard"
 PAGE_CLIENTS = "Clientes"
-PAGE_VISITS = "Visitas Técnicas"
+PAGE_VISITS = "Nova Visita"
+PAGE_HISTORY = "Histórico de Visitas"
 PAGE_PHOTOS = "Fotografias"
-PAGE_REPORTS = "Relatórios & Exportação"
+PAGE_REPORTS = "Relatórios"
 PAGE_PROFILE = "Alterar Senha"
 PAGE_ADMIN = "Gerenciar Usuários"
 
 NAV_ITEMS = [
     (PAGE_DASHBOARD, "🏠", "Visão geral e indicadores"),
     (PAGE_CLIENTS, "👥", "Cadastro e consulta de empresas"),
-    (PAGE_VISITS, "🧾", "Visitas e formulários técnicos"),
+    (PAGE_VISITS, "➕", "Cadastro de nova visita técnica"),
+    (PAGE_HISTORY, "🗂️", "Consultar, filtrar e gerenciar visitas"),
     (PAGE_PHOTOS, "📷", "Fotografias das visitas"),
     (PAGE_REPORTS, "📊", "Relatórios PDF e planilhas"),
     (PAGE_PROFILE, "🔐", "Alterar sua senha"),

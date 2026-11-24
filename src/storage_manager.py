@@ -290,6 +290,12 @@ def add_visit(
     date_start: str = "",
     date_end: str = "",
     horario: str = "",
+    *,
+    visit_type: str = "",
+    objective: str = "",
+    company_details: dict = None,
+    sst_checklist: dict = None,
+    technical_observations: dict = None,
 ):
     clients = load_clients()
     if client_id not in clients:
@@ -314,6 +320,14 @@ def add_visit(
         "horario": clean_horario,
         "technician": technician,
         "status": status,  # "Rascunho", "Em Andamento", "Finalizada"
+        # Campos ampliados do cadastro (opcionais e compatíveis com visitas antigas).
+        "visit_type": str(visit_type or "").strip(),
+        "objective": str(objective or "").strip(),
+        "company_details": company_details if isinstance(company_details, dict) else {},
+        "sst_checklist": sst_checklist if isinstance(sst_checklist, dict) else {},
+        "technical_observations": (
+            technical_observations if isinstance(technical_observations, dict) else {}
+        ),
         "worker": {
             "name": clean_worker,
             "photo_path": "",
@@ -428,6 +442,27 @@ def update_visit(
     except StorageError as exc:
         return False, str(exc)
     return True, "Visita salva com sucesso."
+
+
+VISIT_STATUSES = ("Rascunho", "Em Andamento", "Finalizada")
+
+
+def set_visit_status(visit_id: str, status: str) -> tuple[bool, str]:
+    """Atualiza apenas o status da visita, preservando todo o restante do registro."""
+    clean_status = str(status or "").strip()
+    if clean_status not in VISIT_STATUSES:
+        return False, "Status inválido."
+    visits = load_visits()
+    if visit_id not in visits:
+        return False, "Visita não encontrada."
+    visits[visit_id]["status"] = clean_status
+    visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    visits[visit_id] = _try_xano_sync_visit(visits[visit_id], visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
+    return True, f"Status atualizado para {clean_status}."
 
 
 def save_visit_weather(
@@ -1142,6 +1177,14 @@ def add_photo_to_visit(
 
     with open(saved_path, "wb") as f:
         f.write(file_bytes)
+
+    # Espelhamento opcional em storage/photos (não altera o caminho oficial).
+    try:
+        from src.storage_bridge import mirror_file
+
+        mirror_file(saved_path, "photos")
+    except Exception:
+        pass
 
     registro = _photo_registro(horario, equipment_label, identificacao_registro)
     photo_record = {

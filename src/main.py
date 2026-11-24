@@ -23,11 +23,13 @@ from src.ui_components import (
     PAGE_ADMIN,
     PAGE_CLIENTS,
     PAGE_DASHBOARD,
+    PAGE_HISTORY,
     PAGE_PHOTOS,
     PAGE_PROFILE,
     PAGE_REPORTS,
     PAGE_VISITS,
     SIDEBAR_OPEN_KEY,
+    VISITS_TAB_LIST,
     VISITS_TAB_NEW,
     apply_global_styles,
     apply_pending_state,
@@ -46,11 +48,20 @@ from src.views.photos_view import render_photos_view
 from src.views.profile_view import render_profile_view
 from src.views.reports_view import render_reports_view
 from src.views.visits_view import render_visits_view
+from src.views.history_view import render_visit_history_view
+
+def _render_new_visit_page():
+    """Rota 'Nova Visita': abre diretamente o formulário de cadastro."""
+    if st.session_state.get("visits_tab", VISITS_TAB_LIST) == VISITS_TAB_LIST:
+        st.session_state["visits_tab"] = VISITS_TAB_NEW
+    render_visits_view()
+
 
 PAGE_RENDERERS = {
     PAGE_DASHBOARD: render_main_dashboard,
     PAGE_CLIENTS: render_clients_view,
-    PAGE_VISITS: render_visits_view,
+    PAGE_VISITS: _render_new_visit_page,
+    PAGE_HISTORY: render_visit_history_view,
     PAGE_PHOTOS: render_photos_view,
     PAGE_REPORTS: render_reports_view,
     PAGE_PROFILE: render_profile_view,
@@ -68,14 +79,14 @@ SESSION_KEYS = (
     "current_page",
 )
 
-# Configuração única do Streamlit. "auto" abre o menu no desktop e o mantém
-# recolhido no celular (< 768 px), comportamento mobile-first do ACNnorte.
-# O estado posterior é controlado pelos controles nativos + botão "☰ Menu".
+# Configuração única do Streamlit. O menu inicia expandido conforme a
+# especificação do dashboard; o estado posterior é controlado pelos controles
+# nativos e pelo botão "☰ Menu", preservando a navegação mobile-first.
 PAGE_CONFIG = {
-    "page_title": "ACNnorte — Visitas Técnicas",
+    "page_title": "ACNnorte",
     "page_icon": "🛡️",
     "layout": "wide",
-    "initial_sidebar_state": "auto",
+    "initial_sidebar_state": "expanded",
 }
 
 
@@ -174,6 +185,13 @@ def _render_sidebar(is_admin: bool):
             help="Iniciar uma nova visita técnica.",
         ):
             navigate_to(PAGE_VISITS, visits_tab=VISITS_TAB_NEW)
+        if st.button(
+            "🗂️ Histórico de visitas",
+            key="quick_visit_history",
+            width="stretch",
+            help="Consultar, filtrar e gerenciar as visitas registradas.",
+        ):
+            navigate_to(PAGE_HISTORY)
 
         _render_xano_smoke_test()
         render_sync_indicator()
@@ -184,7 +202,7 @@ def _render_sidebar(is_admin: bool):
                     st.session_state.pop(key, None)
                 st.rerun()
         else:
-            if st.button("🔄 Reiniciar Tela", key="reset_screen", width="stretch", help="Retorna ao Painel Inicial"):
+            if st.button("🔄 Reiniciar Tela", key="reset_screen", width="stretch", help="Retorna ao Dashboard"):
                 st.session_state["current_page"] = PAGE_DASHBOARD
                 st.session_state["active_visit_id"] = None
                 st.rerun()
