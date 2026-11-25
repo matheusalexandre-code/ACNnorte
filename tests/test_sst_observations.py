@@ -64,7 +64,6 @@ def _authenticated_app():
     at.session_state["user_id"] = "usr_ana_norte"
     at.session_state["user_role"] = "usuario"
     at.session_state["is_admin"] = False
-    at.session_state["admin_authorized"] = False
     return at
 
 

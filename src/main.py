@@ -73,8 +73,6 @@ SESSION_KEYS = (
     "user_id",
     "user_role",
     "is_admin",
-    "admin_authorized",
-    "admin_authorized_at",
     "auth_source",
     "xano_token",
     "xano_user",
@@ -85,9 +83,7 @@ SESSION_KEYS = (
     "clients_tab",
     "xano_remote_visits",
     "xano_smoke_result",
-    "login_search",
     "login_user",
-    "login_admin_code",
 )
 
 # Configuração única do Streamlit. O menu inicia expandido conforme a
@@ -157,8 +153,8 @@ def _render_sidebar(is_admin: bool):
 
         for page, icon, description in NAV_ITEMS:
             # "Alterar Senha" permanece como rota interna, mas fora do menu.
-            # "Gerenciar Usuários" é exibido somente ao ADM autorizado no
-            # servidor, pois o cadastro de usuários faz parte deste fluxo.
+            # "Gerenciar Usuários" é exibido somente quando o perfil ADM vem
+            # do cadastro do usuário identificado na sessão.
             if page == PAGE_PROFILE:
                 continue
             if page == PAGE_ADMIN and not is_admin:
@@ -202,8 +198,8 @@ def _render_sidebar(is_admin: bool):
         render_sync_indicator()
 
         if st.button("🚪 Sair", key="logout", width="stretch"):
-            # Encerra a identificação, a autorização administrativa e os
-            # resíduos da sessão; o próximo acesso volta à tela de login.
+            # Encerra a identificação, o perfil e os resíduos da sessão; o
+            # próximo acesso volta à tela de login.
             for key in SESSION_KEYS:
                 st.session_state.pop(key, None)
             st.session_state["current_page"] = PAGE_DASHBOARD

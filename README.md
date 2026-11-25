@@ -22,7 +22,7 @@ O projeto segue uma arquitetura modular baseada em responsabilidades:
 
 ## ✨ Recursos de Experiência do Usuário
 
-- **Login simplificado por seleção de nome**, com a logo oficial ACNnorte e sem senha para usuários comuns; o perfil ADM exige autorização separada configurada no servidor (`ACN_ADMIN_ACCESS_CODE`).
+- **Login por seleção de nome**, com a logo oficial ACNnorte, sem senha, sem pesquisa e sem código administrativo. O perfil ADM é lido do cadastro; por não verificar identidade, deve ser usado somente em ambiente controlado.
 - **Painel inicial (Dashboard)** com indicadores operacionais, atalhos de ação rápida e últimas atividades.
 - **Gestão de clientes** com busca em tempo real, validação de CNPJ e consulta com histórico.
 - **Vistorias técnicas & Checklist normativo Wizard** em 5 etapas (NR-06, NR-24/NR-08, IT/NR-23, NR-12 e PGR/PCMSO/CIPA) com barra de progresso e salvamento automático.
@@ -31,7 +31,7 @@ O projeto segue uma arquitetura modular baseada em responsabilidades:
 - **Assinaturas digitais obrigatórias** do Responsável Técnico e do Avaliador, com desenho por mouse ou toque, visualização, limpeza e inclusão no PDF.
 - **Gestão fotográfica** com upload, pré-visualização, legendas técnicas, galeria da visita e substituição de imagens.
 - **Emissão de laudos PDF profissionais** formatados com ReportLab e **exportação em planilhas Excel (.xlsx)**.
-- **Área administrativa protegida** para cadastro de usuários comuns e gestão de contas legadas; o acesso exige autorização ADM validada no servidor, não apenas a seleção do nome.
+- **Área administrativa** para cadastro de usuários comuns e gestão de contas legadas, disponível ao perfil ADM registrado no cadastro.
 - Layout responsivo para computador, tablet e celular, com a identidade visual ACNnorte.
 
 Detalhes em `docs/acnnorte/06-melhorias-experiencia.md`.

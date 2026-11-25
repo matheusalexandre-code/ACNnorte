@@ -1,4 +1,4 @@
-"""Testes do login sem senha, autorização ADM e base compartilhada."""
+"""Testes do login sem senha, perfil ADM pelo cadastro e base compartilhada."""
 
 from pathlib import Path
 
@@ -25,7 +25,6 @@ def isolated_store(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "CLIENTS_FILE", str(data_dir / "clients.json"))
     monkeypatch.setattr(storage, "VISITS_FILE", str(data_dir / "visits.json"))
     monkeypatch.setattr(storage, "PHOTOS_DIR", str(data_dir / "photos"))
-    monkeypatch.delenv(auth.ADMIN_ACCESS_CODE_ENV, raising=False)
     auth.init_db()
     storage.init_storage()
     return auth, storage
@@ -37,8 +36,6 @@ def _admin_session(app):
     app.session_state["user_id"] = "usr_claudio_norte"
     app.session_state["user_role"] = "administrador"
     app.session_state["is_admin"] = True
-    app.session_state["admin_authorized"] = True
-    app.session_state["admin_authorized_at"] = "2026-11-24 22:00:00"
     return app
 
 
@@ -48,7 +45,6 @@ def _common_session(app):
     app.session_state["user_id"] = "usr_ana_norte"
     app.session_state["user_role"] = "usuario"
     app.session_state["is_admin"] = False
-    app.session_state["admin_authorized"] = False
     return app
 
 
@@ -131,39 +127,52 @@ def test_duplicate_and_empty_names_are_rejected(isolated_store):
 
 
 # ---------------------------------------------------------------------------
-# 4-8. Login sem senha, identificação, autorização e cadastro pelo ADM
+# 4-10. Login sem senha, perfil ADM pelo cadastro e cadastro pelo ADM
 # ---------------------------------------------------------------------------
 
 
-def test_common_login_has_no_password_field_and_sets_identity(isolated_store):
+@pytest.mark.parametrize(
+    ("user_id", "display_name", "expected_admin"),
+    [
+        ("usr_ana_norte", "Ana.norte", False),
+        ("usr_nadir_norte", "Nadir Norte", False),
+        ("usr_claudio_norte", "Cláudio Norte", True),
+    ],
+)
+def test_user_logs_in_directly_without_password_or_code(
+    isolated_store, user_id, display_name, expected_admin
+):
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.run()
 
     labels = [widget.label for widget in app.text_input]
-    assert "Pesquisar usuário" in labels
+    assert "Pesquisar usuário" not in labels
     assert "Senha" not in labels
+    assert "Autorização administrativa" not in labels
 
-    app.selectbox(key="login_user").set_value("usr_ana_norte")
+    app.selectbox(key="login_user").set_value(user_id)
     app.button(key="login_submit").click()
     app.run()
 
     assert not app.exception, [error.value for error in app.exception]
     assert app.session_state["authenticated"] is True
-    assert app.session_state["username"] == "Ana.norte"
-    assert app.session_state["user_id"] == "usr_ana_norte"
-    assert app.session_state["is_admin"] is False
+    assert app.session_state["username"] == display_name
+    assert app.session_state["user_id"] == user_id
+    assert app.session_state["is_admin"] is expected_admin
 
 
-def test_admin_code_is_validated_only_with_server_configuration(
-    isolated_store, monkeypatch
-):
-    assert auth.admin_access_configured() is False
-    assert auth.verify_admin_access_code("qualquer") is False
+def test_no_admin_code_reference_remains_in_login_flow():
+    login_source = (ROOT / "src" / "views" / "login_view.py").read_text(
+        encoding="utf-8"
+    )
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
-    monkeypatch.setenv(auth.ADMIN_ACCESS_CODE_ENV, "codigo-secreto")
-    assert auth.admin_access_configured() is True
-    assert auth.verify_admin_access_code("codigo-secreto") is True
-    assert auth.verify_admin_access_code("codigo-errado") is False
+    assert "ACN_ADMIN_ACCESS_CODE" not in login_source
+    assert "admin_access_configured" not in login_source
+    assert "verify_admin_access_code" not in login_source
+    assert "ACN_ADMIN_ACCESS_CODE" not in env_example
+    assert not hasattr(auth, "ADMIN_ACCESS_CODE_ENV")
+    assert not hasattr(auth, "verify_admin_access_code")
 
 
 def test_common_user_cannot_reach_admin_management(isolated_store):
@@ -176,8 +185,7 @@ def test_common_user_cannot_reach_admin_management(isolated_store):
     assert all(button.key != "nav_Gerenciar Usuários" for button in app.button)
 
 
-def test_admin_can_register_common_user_without_password(isolated_store, monkeypatch):
-    monkeypatch.setenv(auth.ADMIN_ACCESS_CODE_ENV, "codigo-secreto")
+def test_admin_can_register_common_user_without_password(isolated_store):
     app = _admin_session(AppTest.from_file(MAIN_SCRIPT, default_timeout=60))
     app.session_state["current_page"] = "Gerenciar Usuários"
     app.run()
@@ -196,20 +204,42 @@ def test_admin_can_register_common_user_without_password(isolated_store, monkeyp
         user["name"] == "Carlos Norte" for user in auth.list_login_users()
     )
 
+    # O novo usuário passa a existir na seleção da tela de login.
+    new_id = users["Carlos Norte"]["user_id"]
+    login_app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    login_app.run()
+    login_app.selectbox(key="login_user").set_value(new_id)
+    login_app.button(key="login_submit").click()
+    login_app.run()
+    assert login_app.session_state["username"] == "Carlos Norte"
+    assert login_app.session_state["is_admin"] is False
 
-def test_forged_admin_session_without_authorization_is_denied(isolated_store):
-    """Marcar is_admin no estado da sessão não basta sem autorização do servidor."""
+
+def test_admin_profile_comes_from_cadastro_not_from_display_name(isolated_store):
+    """O nome exibido não define o privilégio; o ID interno e o cadastro definem."""
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.session_state["authenticated"] = True
     app.session_state["username"] = "Cláudio Norte"
-    app.session_state["user_id"] = "usr_claudio_norte"
-    app.session_state["is_admin"] = True
-    app.session_state["admin_authorized"] = False
+    app.session_state["user_id"] = "usr_ana_norte"
     app.session_state["current_page"] = "Gerenciar Usuários"
     app.run()
 
     assert app.session_state["is_admin"] is False
     assert app.session_state["current_page"] == "Dashboard"
+
+
+def test_navigation_works_after_passwordless_login(isolated_store):
+    app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    app.run()
+    app.selectbox(key="login_user").set_value("usr_ana_norte")
+    app.button(key="login_submit").click()
+    app.run()
+
+    app.button(key="nav_Clientes").click()
+    app.run()
+
+    assert not app.exception, [error.value for error in app.exception]
+    assert app.session_state["current_page"] == "Clientes"
 
 
 def test_logout_clears_identification_and_returns_to_login(isolated_store):

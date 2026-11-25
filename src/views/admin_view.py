@@ -14,19 +14,19 @@ from src.ui_components import info_banner, record_sync, render_acnnorte_logo
 from src.xano_sync import pull_visits, sync_enabled
 
 
-def _admin_authorized() -> bool:
-    """Revalida o privilégio no cadastro persistido antes de cada operação."""
+def _current_user_is_admin() -> bool:
+    """Revalida o perfil ADM no cadastro antes de cada operação."""
     if not session_user_is_admin():
         st.error(
-            "Acesso negado. Esta área é restrita a administradores autorizados "
-            "da ACNnorte."
+            "Acesso negado. Esta área é restrita a usuários com perfil "
+            "administrativo na ACNnorte."
         )
         return False
     return True
 
 
 def render_admin_view():
-    if not _admin_authorized():
+    if not _current_user_is_admin():
         return
 
     render_acnnorte_logo(size="medium", subtitle="Gerenciamento Interno de Usuários")
@@ -79,7 +79,7 @@ def render_admin_view():
                             if st.button(
                                 status_label, key=f"toggle_{username}"
                             ):
-                                if not _admin_authorized():
+                                if not _current_user_is_admin():
                                     return
                                 success, msg = toggle_user_status(username)
                                 if success:
@@ -109,7 +109,7 @@ def render_admin_view():
                             type="primary",
                             width="stretch",
                         ):
-                            if not _admin_authorized():
+                            if not _current_user_is_admin():
                                 return
                             success, msg = delete_user(username)
                             st.session_state.pop("user_delete_pending", None)
@@ -147,7 +147,7 @@ def render_admin_view():
                 "Nova senha temporária", type="password", key="reset_pwd_input"
             )
             if st.button("Aplicar Nova Senha"):
-                if not _admin_authorized():
+                if not _current_user_is_admin():
                     return
                 if not new_admin_pwd or len(new_admin_pwd) < 6:
                     st.error("A senha deve ter pelo menos 6 caracteres.")
@@ -178,7 +178,7 @@ def render_admin_view():
                 key="xano_pull_preview",
                 width="stretch",
             ):
-                if not _admin_authorized():
+                if not _current_user_is_admin():
                     return
                 try:
                     st.session_state["xano_remote_visits"] = pull_visits(
@@ -203,7 +203,7 @@ def render_admin_view():
                         type="primary",
                         width="stretch",
                     ):
-                        if not _admin_authorized():
+                        if not _current_user_is_admin():
                             return
                         try:
                             local = load_visits()
@@ -231,8 +231,8 @@ def render_admin_view():
     with tab2:
         st.markdown("#### Cadastrar Novo Usuário")
         info_banner(
-            "O cadastro de novos usuários é exclusivo para o administrador "
-            "autorizado. Novos cadastros recebem perfil de Usuário Comum."
+            "O cadastro de novos usuários é exclusivo para o perfil "
+            "administrativo. Novos cadastros recebem perfil de Usuário Comum."
         )
 
         with st.form("new_user_form"):
@@ -246,7 +246,7 @@ def render_admin_view():
             submit_new = st.form_submit_button("Cadastrar Usuário")
 
             if submit_new:
-                if not _admin_authorized():
+                if not _current_user_is_admin():
                     return
                 if not new_username.strip():
                     st.error("Informe o nome do usuário.")

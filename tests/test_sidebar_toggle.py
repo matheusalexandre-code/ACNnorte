@@ -19,7 +19,6 @@ def isolated_users(tmp_path, monkeypatch):
 
     monkeypatch.setattr(auth, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(auth, "USERS_FILE", str(tmp_path / "users.json"))
-    monkeypatch.delenv(auth.ADMIN_ACCESS_CODE_ENV, raising=False)
     auth.init_db()
     yield
 
@@ -31,8 +30,6 @@ def _authenticated_app():
     app.session_state["user_id"] = "usr_claudio_norte"
     app.session_state["user_role"] = "administrador"
     app.session_state["is_admin"] = True
-    app.session_state["admin_authorized"] = True
-    app.session_state["admin_authorized_at"] = "2026-11-24 22:00:00"
     return app
 
 

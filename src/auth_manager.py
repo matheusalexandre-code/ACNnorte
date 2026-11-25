@@ -12,10 +12,6 @@ from datetime import datetime
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
-# Código de autorização administrativa mantido exclusivamente no servidor.
-# A seleção do nome identifica o usuário; este segredo autoriza o privilégio ADM.
-ADMIN_ACCESS_CODE_ENV = "ACN_ADMIN_ACCESS_CODE"
-
 # Usuários iniciais obrigatórios. O identificador interno é estável e não muda
 # quando o nome de exibição é alterado no futuro.
 DEFAULT_USERS = (
@@ -391,33 +387,17 @@ def delete_user(username: str):
     return True, "Usuário removido com sucesso."
 
 
-def admin_access_configured() -> bool:
-    """Informa se o segredo de autorização administrativa está no servidor."""
-    return bool(os.getenv(ADMIN_ACCESS_CODE_ENV, "").strip())
-
-
-def verify_admin_access_code(code: str) -> bool:
-    """Confere o código administrativo apenas no servidor, sem expô-lo."""
-    expected = os.getenv(ADMIN_ACCESS_CODE_ENV, "").strip()
-    provided = str(code or "")
-    if not expected or not provided:
-        return False
-    return hmac.compare_digest(provided, expected)
-
-
 def session_user_is_admin() -> bool:
-    """Revalida no cadastro real se a sessão atual tem autorização ADM.
+    """Revalida no cadastro se o usuário identificado na sessão tem perfil ADM.
 
-    A seleção do nome, isoladamente, nunca concede privilégios. É exigido o
-    código administrativo validado no servidor e o papel ``is_admin`` do
-    registro persistido.
+    O nome exibido não define o privilégio: a verificação usa o identificador
+    interno da sessão e o campo ``is_admin`` do registro persistido. Este fluxo
+    não autentica identidade e pressupõe uso em ambiente controlado.
     """
     try:
         import streamlit as st
 
         if not st.session_state.get("authenticated", False):
-            return False
-        if not st.session_state.get("admin_authorized", False):
             return False
         record = get_active_user_by_id(str(st.session_state.get("user_id") or ""))
         if not isinstance(record, dict):

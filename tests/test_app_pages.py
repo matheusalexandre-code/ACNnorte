@@ -27,7 +27,6 @@ def isolated_users(tmp_path, monkeypatch):
 
     monkeypatch.setattr(auth, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(auth, "USERS_FILE", str(tmp_path / "users.json"))
-    monkeypatch.delenv(auth.ADMIN_ACCESS_CODE_ENV, raising=False)
     auth.init_db()
     yield
 
@@ -39,25 +38,26 @@ def _authenticated_app():
     app.session_state["user_id"] = "usr_claudio_norte"
     app.session_state["user_role"] = "administrador"
     app.session_state["is_admin"] = True
-    app.session_state["admin_authorized"] = True
-    app.session_state["admin_authorized_at"] = "2026-11-24 22:00:00"
     return app
 
 
-def test_login_screen_renders_passwordless_selection_with_official_logo():
+def test_login_screen_has_only_logo_welcome_selection_and_button():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.run()
     assert not app.exception, [error.value for error in app.exception]
     assert app.session_state["authenticated"] is False
 
     labels = [widget.label for widget in app.text_input]
-    assert "Pesquisar usuário" in labels
+    assert "Pesquisar usuário" not in labels
     assert "Senha" not in labels
-    assert "E-mail ou usuário" not in labels
+    assert "Autorização administrativa" not in labels
+    assert len(app.text_input) == 0
     assert app.selectbox(key="login_user") is not None
+    assert app.button(key="login_submit").label == "ENTRAR"
 
     markup = "\n".join(str(item.value) for item in app.markdown)
     assert "data:image/jpeg;base64" in markup
+    assert "Bem-vindo(a) ao ACNnorte" in markup
 
 
 def test_login_blocks_empty_selection():
@@ -84,60 +84,28 @@ def test_common_user_logs_in_without_password():
     assert app.session_state["username"] == "Ana.norte"
     assert app.session_state["user_id"] == "usr_ana_norte"
     assert app.session_state["is_admin"] is False
-    assert app.session_state["admin_authorized"] is False
     assert app.session_state["current_page"] == "Dashboard"
 
 
-def test_admin_login_requires_server_side_authorization(monkeypatch):
-    monkeypatch.setenv("ACN_ADMIN_ACCESS_CODE", "segredo-adm")
-
+def test_admin_login_has_no_password_or_code_and_uses_cadastro_role():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.run()
     app.selectbox(key="login_user").set_value("usr_claudio_norte")
     app.run()
 
-    assert app.text_input(key="login_admin_code") is not None
-    app.text_input(key="login_admin_code").input("codigo-errado")
-    app.button(key="login_submit").click()
-    app.run()
-
-    assert app.session_state["authenticated"] is False
-    assert any(
-        "inválido" in str(getattr(err, "value", "")) for err in app.error
+    assert len(app.text_input) == 0
+    assert not any(
+        "autorização" in str(getattr(err, "value", "")).lower()
+        for err in app.warning
     )
-
-
-def test_admin_login_with_valid_code_grants_admin_permission(monkeypatch):
-    monkeypatch.setenv("ACN_ADMIN_ACCESS_CODE", "segredo-adm")
-
-    app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
-    app.run()
-    app.selectbox(key="login_user").set_value("usr_claudio_norte")
-    app.run()
-    app.text_input(key="login_admin_code").input("segredo-adm")
     app.button(key="login_submit").click()
     app.run()
 
     assert not app.exception, [error.value for error in app.exception]
     assert app.session_state["authenticated"] is True
     assert app.session_state["user_id"] == "usr_claudio_norte"
+    assert app.session_state["user_role"] == "administrador"
     assert app.session_state["is_admin"] is True
-    assert app.session_state["admin_authorized"] is True
-
-
-def test_admin_login_is_blocked_when_server_secret_is_missing():
-    app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
-    app.run()
-    app.selectbox(key="login_user").set_value("usr_claudio_norte")
-    app.run()
-    app.button(key="login_submit").click()
-    app.run()
-
-    assert app.session_state["authenticated"] is False
-    assert any(
-        "não está configurada" in str(getattr(err, "value", ""))
-        for err in app.error
-    )
 
 
 @pytest.mark.parametrize("page", PAGES)

@@ -1,41 +1,27 @@
 """Tela de login simplificada do ACNnorte.
 
-O fluxo comum identifica o usuário pela seleção do nome, sem senha. O perfil
-administrativo exige uma autorização separada, verificada exclusivamente no
-servidor por meio da variável de ambiente ``ACN_ADMIN_ACCESS_CODE``.
-"""
+A identificação é feita apenas pela seleção do nome cadastrado. Não há senha,
+pesquisa de usuários nem código administrativo: o perfil ADM é lido do próprio
+cadastro, por meio do identificador interno do usuário selecionado.
 
-from datetime import datetime
+Este modelo não verifica identidade e é adequado somente para uso em ambiente
+controlado, sem exposição pública.
+"""
 
 import streamlit as st
 
-from src.auth_manager import (
-    admin_access_configured,
-    find_user_record,
-    list_login_users,
-    verify_admin_access_code,
-)
+from src.auth_manager import find_user_record, list_login_users
 from src.ui_components import LOGIN_LOGO_PATH, render_acnnorte_logo
 
 
-def _persist_session(
-    user_key: str,
-    record: dict,
-    admin_authorized: bool = False,
-) -> None:
-    """Grava a sessão com identificação e autorização claramente separadas."""
+def _persist_session(user_key: str, record: dict) -> None:
+    """Registra na sessão a identificação e o perfil vindos do cadastro."""
     is_admin_record = bool(record.get("is_admin", False))
     st.session_state["authenticated"] = True
     st.session_state["username"] = str(record.get("name") or user_key)
     st.session_state["user_id"] = str(record.get("user_id") or "")
     st.session_state["user_role"] = "administrador" if is_admin_record else "usuario"
-    st.session_state["is_admin"] = bool(is_admin_record and admin_authorized)
-    st.session_state["admin_authorized"] = bool(is_admin_record and admin_authorized)
-    st.session_state["admin_authorized_at"] = (
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if is_admin_record and admin_authorized
-        else None
-    )
+    st.session_state["is_admin"] = is_admin_record
     st.session_state["auth_source"] = "local"
 
     # O login por seleção não produz token Xano; evita reaproveitar uma sessão
@@ -53,55 +39,14 @@ def _render_login_form() -> None:
         )
         return
 
-    search = st.text_input(
-        "Pesquisar usuário",
-        placeholder="Digite parte do nome para localizar seu cadastro",
-        key="login_search",
-    ).strip()
-    filtered = [
-        user
-        for user in users
-        if not search or search.casefold() in user["name"].casefold()
-    ]
-
-    selected_id = None
-    selected_user = None
-    if filtered:
-        names_by_id = {user["id"]: user["name"] for user in filtered}
-        selected_id = st.selectbox(
-            "Selecione seu nome",
-            options=list(names_by_id.keys()),
-            index=None,
-            format_func=lambda value: names_by_id.get(value, value),
-            placeholder="Digite para pesquisar...",
-            key="login_user",
-        )
-        if selected_id:
-            selected_user = next(
-                (user for user in filtered if user["id"] == selected_id), None
-            )
-    else:
-        st.warning(
-            "Nenhum usuário corresponde à pesquisa. Verifique o nome digitado."
-        )
-
-    admin_code = ""
-    if selected_user and selected_user.get("is_admin"):
-        st.info(
-            "Este cadastro possui perfil administrativo. Informe a autorização "
-            "administrativa configurada no servidor."
-        )
-        if not admin_access_configured():
-            st.warning(
-                "A autorização administrativa não está configurada no servidor. "
-                "Defina a variável ACN_ADMIN_ACCESS_CODE para liberar o acesso ADM."
-            )
-        admin_code = st.text_input(
-            "Autorização administrativa",
-            type="password",
-            key="login_admin_code",
-            help="Código separado do login comum, validado somente no servidor.",
-        )
+    names_by_id = {user["id"]: user["name"] for user in users}
+    selected_id = st.selectbox(
+        "Selecione seu nome",
+        options=list(names_by_id.keys()),
+        index=None,
+        format_func=lambda value: names_by_id.get(value, value),
+        key="login_user",
+    )
 
     if st.button(
         "ENTRAR",
@@ -121,19 +66,7 @@ def _render_login_form() -> None:
             )
             return
 
-        is_admin_record = bool(record.get("is_admin", False))
-        if is_admin_record:
-            if not admin_access_configured():
-                st.error(
-                    "A autorização administrativa não está configurada no "
-                    "servidor. O acesso ADM permanece bloqueado."
-                )
-                return
-            if not verify_admin_access_code(admin_code):
-                st.error("Código de autorização administrativa inválido.")
-                return
-
-        _persist_session(user_key, record, admin_authorized=is_admin_record)
+        _persist_session(user_key, record)
         st.success("Acesso autorizado. Abrindo o ACNnorte...")
         st.rerun()
 
@@ -158,7 +91,3 @@ def render_login_view():
             unsafe_allow_html=True,
         )
         _render_login_form()
-        st.caption(
-            "A identificação por nome não concede privilégios administrativos. "
-            "Operações de administração exigem autorização própria do servidor."
-        )
