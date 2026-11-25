@@ -9,6 +9,10 @@ avaliação profissional nem o cumprimento das normas oficiais.
 SST_OPTIONS = ("Conforme", "Não conforme", "Não aplicável")
 SST_UNANSWERED = "Não avaliado"
 
+# Observação individual por categoria (os 14 tópicos da seção 3 do formulário).
+SST_OBSERVATION_LABEL = "Comentários / Observações"
+SST_OBSERVATION_PLACEHOLDER = "Adicione observações ou não conformidades deste tópico..."
+
 # Categorias organizadas de forma modular: basta adicionar uma nova entrada
 # para incluir um bloco inteiro no formulário e nos relatórios.
 SST_CATEGORIES = {
@@ -171,3 +175,49 @@ def summarize_sst(answers: dict) -> dict:
     counts["total"] = sum(counts.values())
     counts["non_conformities"] = non_conformities
     return counts
+
+
+def sst_observation_widget_key(visit_id: str, category_key: str) -> str:
+    """Chave estável e única para o campo de observações de um tópico.
+
+    O identificador usa o ID da visita e o ID da categoria — nunca a posição
+    na lista — para não colidir entre visitas nem mudar se a ordem dos tópicos
+    for alterada.
+    """
+    return f"sst_obs_{visit_id}_{category_key}"
+
+
+def normalize_sst_observations(value) -> dict:
+    """Normaliza observações por tópico com valores padrão seguros.
+
+    Registros antigos não possuem ``sst_observations``; o resultado sempre traz
+    as 14 chaves conhecidas, preenchidas com string vazia quando ausentes.
+    """
+    if not isinstance(value, dict):
+        value = {}
+    normalized = {}
+    for category_key in SST_CATEGORIES:
+        raw = value.get(category_key, "")
+        if raw is None:
+            raw = ""
+        normalized[category_key] = str(raw).strip()
+    return normalized
+
+
+def get_sst_observations(visit: dict) -> dict:
+    """Retorna as observações persistidas de uma visita (compatível com antigas)."""
+    if not isinstance(visit, dict):
+        return normalize_sst_observations(None)
+    return normalize_sst_observations(visit.get("sst_observations"))
+
+
+def build_sst_observations(visit_id: str, observations: dict) -> dict:
+    """Converte os valores dos widgets em observações indexadas por tópico."""
+    if not isinstance(observations, dict):
+        observations = {}
+    collected = {}
+    for category_key in SST_CATEGORIES:
+        key = sst_observation_widget_key(visit_id, category_key)
+        raw = observations.get(key, "")
+        collected[category_key] = "" if raw is None else str(raw).strip()
+    return collected

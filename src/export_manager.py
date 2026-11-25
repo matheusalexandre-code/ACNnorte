@@ -1,5 +1,6 @@
 import json
 import os
+from html import escape as html_escape
 import pandas as pd
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
@@ -8,6 +9,12 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, KeepTogether, HRFlowable
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from src.checklist_sst import (
+    SST_CATEGORIES,
+    SST_OBSERVATION_LABEL,
+    SST_UNANSWERED,
+    get_sst_observations,
+)
 from src.storage_manager import (
     DATA_DIR,
     get_visit_equipment,
@@ -382,6 +389,33 @@ def generate_pdf_report(visit_id: str) -> str:
         
     story.append(Spacer(1, 10))
 
+    # Checklist de Segurança do Trabalho: resultado e observação por tópico.
+    story.append(Paragraph("Checklist de Segurança do Trabalho", section_style))
+    sst_answers = visit.get("sst_checklist")
+    sst_answers = sst_answers if isinstance(sst_answers, dict) else {}
+    sst_observations = get_sst_observations(visit)
+    for category_key, category in SST_CATEGORIES.items():
+        story.append(Paragraph(f"<b>{html_escape(category['title'])}</b>", bold_style))
+        for item in category["items"]:
+            result = str(sst_answers.get(item["id"], SST_UNANSWERED) or SST_UNANSWERED)
+            story.append(
+                Paragraph(
+                    f"- {html_escape(item['label'])}: {html_escape(result)}",
+                    normal_style,
+                )
+            )
+        observation = str(sst_observations.get(category_key) or "").strip()
+        if observation:
+            story.append(
+                Paragraph(
+                    f"<b>{html_escape(SST_OBSERVATION_LABEL)}:</b> "
+                    f"{html_escape(observation).replace(chr(10), '<br/>')}",
+                    normal_style,
+                )
+            )
+        story.append(Spacer(1, 4))
+    story.append(Spacer(1, 6))
+
     # Equipment used in noise dosimetry.
     story.append(
         Paragraph(
@@ -668,6 +702,18 @@ def export_visits_to_excel() -> str:
         except Exception:
             forms_structured = str(forms_data)
         caderno = v.get("caderno_avaliacao") if isinstance(v.get("caderno_avaliacao"), dict) else {}
+        sst_answers = v.get("sst_checklist") if isinstance(v.get("sst_checklist"), dict) else {}
+        sst_observations = get_sst_observations(v)
+        sst_columns = {}
+        for category_key, category in SST_CATEGORIES.items():
+            lines = []
+            for item in category["items"]:
+                result = str(sst_answers.get(item["id"], SST_UNANSWERED) or SST_UNANSWERED)
+                lines.append(f"{item['label']}: {result}")
+            observation = str(sst_observations.get(category_key) or "").strip()
+            if observation:
+                lines.append(f"{SST_OBSERVATION_LABEL}: {observation}")
+            sst_columns[f"Checklist SST - {category['title']}"] = "\n".join(lines)
         status_excel = str(v.get("status") or "").strip()
         if not status_excel or status_excel.upper() == "N/A":
             status_excel = "Não visitado"
@@ -698,6 +744,7 @@ def export_visits_to_excel() -> str:
             "Origem Temperatura": weather.get("source", ""),
             "Horário Consulta Temperatura": weather.get("captured_at", ""),
             "Formulário (estruturado)": forms_structured,
+            **sst_columns,
             "Caderno - Empresa Avaliada": caderno.get("empresa_avaliada", ""),
             "Caderno - Unidade": caderno.get("unidade", ""),
             "Caderno - Estado": caderno.get("estado", ""),

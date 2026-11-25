@@ -260,6 +260,10 @@ def _build_ext_payload(visit: Mapping[str, Any]) -> dict[str, Any]:
         "weather": weather,
         "signatures": sig_meta,
         "forms": forms,
+        # Checklist SST e suas observações individuais trafegam no envelope
+        # existente, sem exigir campos/endpoints novos no Xano.
+        "sst_checklist": visit.get("sst_checklist") if isinstance(visit.get("sst_checklist"), dict) else {},
+        "sst_observations": visit.get("sst_observations") if isinstance(visit.get("sst_observations"), dict) else {},
         "caderno_avaliacao": visit.get("caderno_avaliacao") if isinstance(visit.get("caderno_avaliacao"), dict) else {},
         "conclusions": _as_text(visit.get("conclusions")),
         "observations": _as_text(visit.get("observations")),
@@ -715,6 +719,21 @@ def _remote_visit_to_local(remote: Mapping[str, Any], existing: dict | None = No
                 rebuilt[local_key] = value
         if rebuilt:
             local["forms"] = rebuilt
+    ext_sst_answers = ext.get("sst_checklist")
+    if isinstance(ext_sst_answers, dict) and ext_sst_answers:
+        local["sst_checklist"] = dict(ext_sst_answers)
+    elif not isinstance(local.get("sst_checklist"), dict):
+        local["sst_checklist"] = {}
+    ext_sst_obs = ext.get("sst_observations")
+    current_sst_obs = (
+        local.get("sst_observations") if isinstance(local.get("sst_observations"), dict) else {}
+    )
+    if isinstance(ext_sst_obs, dict):
+        merged_sst_obs = dict(current_sst_obs)
+        merged_sst_obs.update(ext_sst_obs)
+        local["sst_observations"] = merged_sst_obs
+    else:
+        local["sst_observations"] = current_sst_obs
     ext_caderno = ext.get("caderno_avaliacao")
     if isinstance(ext_caderno, dict) and ext_caderno:
         current_caderno = local.get("caderno_avaliacao") if isinstance(local.get("caderno_avaliacao"), dict) else {}

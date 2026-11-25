@@ -6,7 +6,12 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
-from src.checklist_sst import SST_CATEGORIES, summarize_sst
+from src.checklist_sst import (
+    SST_CATEGORIES,
+    SST_OBSERVATION_LABEL,
+    get_sst_observations,
+    summarize_sst,
+)
 from src.export_manager import export_visits_to_excel, generate_pdf_report
 from src.storage_manager import (
     VISIT_STATUSES,
@@ -128,6 +133,7 @@ def _render_detail(visit_id: str, visit: dict, clients: dict) -> None:
     st.markdown("#### ✅ Checklist de Segurança do Trabalho")
     answers = visit.get("sst_checklist")
     answers = answers if isinstance(answers, dict) else {}
+    sst_observations = get_sst_observations(visit)
     summary = summarize_sst(answers)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Conforme", summary["Conforme"])
@@ -140,6 +146,11 @@ def _render_detail(visit_id: str, visit: dict, clients: dict) -> None:
             for item in category["items"]:
                 st.markdown(
                     f"- **{item['label']}:** {html.escape(str(answers.get(item['id'], 'Não avaliado')))}"
+                )
+            observation = sst_observations.get(category_key, "")
+            if observation:
+                st.markdown(
+                    f"**{SST_OBSERVATION_LABEL}:** {html.escape(observation)}"
                 )
 
     st.markdown("#### 📝 Observações técnicas")

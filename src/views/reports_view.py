@@ -1,8 +1,14 @@
+import html
 import os
 
 import streamlit as st
 
-from src.checklist_sst import summarize_sst
+from src.checklist_sst import (
+    SST_CATEGORIES,
+    SST_OBSERVATION_LABEL,
+    get_sst_observations,
+    summarize_sst,
+)
 from src.export_manager import EXPORTS_DIR
 from src.features.visit_enhancements.reports import (
     generate_clients_excel_download,
@@ -44,6 +50,15 @@ def _render_report_preview(visit: dict, clients: dict) -> None:
 
     for issue in summary["non_conformities"]:
         st.warning(f"**{issue['categoria']}** — {issue['item']}")
+
+    sst_observations = get_sst_observations(visit)
+    for category_key, category in SST_CATEGORIES.items():
+        observation = sst_observations.get(category_key, "")
+        if observation:
+            st.markdown(
+                f"**{html.escape(category['title'])}** — {SST_OBSERVATION_LABEL}: "
+                f"{html.escape(observation)}"
+            )
 
     observations = visit.get("technical_observations")
     observations = observations if isinstance(observations, dict) else {}

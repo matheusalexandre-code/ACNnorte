@@ -8,9 +8,14 @@ import streamlit as st
 
 from src.checklist_sst import (
     SST_CATEGORIES,
+    SST_OBSERVATION_LABEL,
+    SST_OBSERVATION_PLACEHOLDER,
     SST_OPTIONS,
     SST_UNANSWERED,
     build_sst_answers,
+    build_sst_observations,
+    get_sst_observations,
+    sst_observation_widget_key,
     sst_widget_key,
 )
 from src.equipment_catalog import equipment_grouped, equipment_label
@@ -267,6 +272,7 @@ def _build_draft(visit: dict) -> dict:
         "horario": visit.get("horario", ""),
         "technician": visit.get("technician", ""),
         "caderno_avaliacao": get_caderno_avaliacao(visit),
+        "sst_observations": get_sst_observations(visit),
     }
 
 
@@ -304,6 +310,15 @@ def _collect_widgets(visit_id: str, draft: dict) -> dict:
         if key in st.session_state:
             caderno[field] = st.session_state[key]
     draft["caderno_avaliacao"] = caderno
+
+    sst_obs = draft.get("sst_observations")
+    if not isinstance(sst_obs, dict):
+        sst_obs = {}
+        draft["sst_observations"] = sst_obs
+    for category_key in SST_CATEGORIES:
+        key = sst_observation_widget_key(visit_id, category_key)
+        if key in st.session_state:
+            sst_obs[category_key] = str(st.session_state[key] or "")
     return draft
 
 
@@ -324,6 +339,7 @@ def _persist_draft(visit_id: str, draft: dict, status: str = None) -> bool:
         date_end=draft.get("date_end") or None,
         horario=draft.get("horario"),
         caderno_avaliacao=draft.get("caderno_avaliacao"),
+        sst_observations=draft.get("sst_observations"),
     )
     if success:
         record_sync()
@@ -370,6 +386,22 @@ def _autosave_caderno(visit_id: str, field: str):
     key = _caderno_key(visit_id, field)
     if key in st.session_state:
         draft.setdefault("caderno_avaliacao", {})[field] = st.session_state[key]
+    _collect_widgets(visit_id, draft)
+    _persist_draft(visit_id, draft)
+
+
+def _autosave_sst_observation(visit_id: str, category_key: str):
+    """Salva a observação de um tópico sem tocar nas respostas do checklist."""
+    draft = st.session_state.get(_draft_key(visit_id))
+    if draft is None:
+        return
+    key = sst_observation_widget_key(visit_id, category_key)
+    if key in st.session_state:
+        observations = draft.get("sst_observations")
+        if not isinstance(observations, dict):
+            observations = {}
+            draft["sst_observations"] = observations
+        observations[category_key] = str(st.session_state[key] or "")
     _collect_widgets(visit_id, draft)
     _persist_draft(visit_id, draft)
 
@@ -658,6 +690,7 @@ def _render_new_visit(clients: dict):
             "nem o cumprimento das normas oficiais aplicáveis."
         )
         sst_answers = {}
+        sst_observations = {}
         for category_key, category in SST_CATEGORIES.items():
             with st.expander(f"{category['icon']} {category['title']}"):
                 for item in category["items"]:
@@ -667,6 +700,13 @@ def _render_new_visit(clients: dict):
                         [SST_UNANSWERED, *SST_OPTIONS],
                         key=key,
                     )
+                observation_key = sst_observation_widget_key("new", category_key)
+                sst_observations[observation_key] = st.text_area(
+                    SST_OBSERVATION_LABEL,
+                    placeholder=SST_OBSERVATION_PLACEHOLDER,
+                    height=100,
+                    key=observation_key,
+                )
 
         st.markdown("#### 4. Observações técnicas")
         obs_general = st.text_area("Observações gerais", key="new_visit_obs_geral")
@@ -728,6 +768,7 @@ def _render_new_visit(clients: dict):
                             "segment": segment.strip(),
                         },
                         sst_checklist=build_sst_answers("new", sst_answers),
+                        sst_observations=build_sst_observations("new", sst_observations),
                         technical_observations={
                             "general": obs_general.strip(),
                             "risks": obs_risks.strip(),
@@ -760,6 +801,14 @@ def _render_new_visit(clients: dict):
                             "Visita salva, mas algumas fotografias foram rejeitadas: "
                             + "; ".join(photo_errors)
                         )
+                    # Limpa os campos do formulário "new" antes do próximo run
+                    # para que observações de uma visita não apareçam em outra.
+                    set_pending_state(
+                        **{
+                            sst_observation_widget_key("new", category_key): ""
+                            for category_key in SST_CATEGORIES
+                        }
+                    )
                     st.session_state.pop("new_visit_client_id", None)
                     st.session_state["active_visit_id"] = visit_id
                     st.session_state[_step_key(visit_id)] = FILL_STEP_IDENTIFICACAO
@@ -1873,6 +1922,35 @@ def _render_modular_resources(visit_id: str) -> None:
         )
 
 
+def _render_sst_checklist(visit_id: str, visit: dict, draft: dict):
+    """Renderiza o checklist SST da visita com observações individuais por tópico."""
+    st.markdown("#### 3. Checklist de Segurança do Trabalho")
+    st.caption(
+        "Checklist de apoio organizado por categoria. Não substitui avaliação profissional "
+        "nem o cumprimento das normas oficiais aplicáveis."
+    )
+    answers = visit.get("sst_checklist")
+    answers = answers if isinstance(answers, dict) else {}
+    observations = draft.get("sst_observations") or {}
+
+    for category_key, category in SST_CATEGORIES.items():
+        with st.expander(f"{category['icon']} {category['title']}", expanded=False):
+            for item in category["items"]:
+                value = answers.get(item["id"], SST_UNANSWERED)
+                st.markdown(f"- **{item['label']}:** {html.escape(str(value))}")
+            key = sst_observation_widget_key(visit_id, category_key)
+            st.session_state.setdefault(key, str(observations.get(category_key) or ""))
+            st.text_area(
+                SST_OBSERVATION_LABEL,
+                key=key,
+                placeholder=SST_OBSERVATION_PLACEHOLDER,
+                height=100,
+                persist_state="session",
+                on_change=_autosave_sst_observation,
+                args=(visit_id, category_key),
+            )
+
+
 def _render_fill_tab(visits: dict):
     render_section_title(
         "Preenchimento da visita",
@@ -1930,6 +2008,9 @@ def _render_fill_tab(visits: dict):
         _render_equipamentos_step(selected_id, visit)
     else:
         _render_caderno_step(selected_id, visit, draft)
+
+    st.markdown("---")
+    _render_sst_checklist(selected_id, visit, draft)
 
     _render_modular_resources(selected_id)
 

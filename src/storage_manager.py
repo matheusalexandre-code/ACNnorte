@@ -295,6 +295,7 @@ def add_visit(
     objective: str = "",
     company_details: dict = None,
     sst_checklist: dict = None,
+    sst_observations: dict = None,
     technical_observations: dict = None,
 ):
     clients = load_clients()
@@ -325,6 +326,11 @@ def add_visit(
         "objective": str(objective or "").strip(),
         "company_details": company_details if isinstance(company_details, dict) else {},
         "sst_checklist": sst_checklist if isinstance(sst_checklist, dict) else {},
+        # Observações individuais por tópico do checklist SST (compatível com
+        # visitas antigas, que não possuem este campo).
+        "sst_observations": (
+            sst_observations if isinstance(sst_observations, dict) else {}
+        ),
         "technical_observations": (
             technical_observations if isinstance(technical_observations, dict) else {}
         ),
@@ -387,6 +393,7 @@ def update_visit(
     date_end: str = None,
     horario: str = None,
     caderno_avaliacao: dict = None,
+    sst_observations: dict = None,
 ):
     visits = load_visits()
     if visit_id not in visits:
@@ -434,6 +441,17 @@ def update_visit(
         if isinstance(caderno_avaliacao, dict):
             current.update(caderno_avaliacao)
         visits[visit_id]["caderno_avaliacao"] = current
+
+    # Mescla por tópico: uma atualização parcial nunca apaga observações de
+    # outros tópicos nem altera as respostas do checklist.
+    if sst_observations is not None:
+        current_obs = visits[visit_id].get("sst_observations")
+        if not isinstance(current_obs, dict):
+            current_obs = {}
+        if isinstance(sst_observations, dict):
+            for topic_key, value in sst_observations.items():
+                current_obs[str(topic_key)] = "" if value is None else str(value)
+        visits[visit_id]["sst_observations"] = current_obs
 
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id], visits)

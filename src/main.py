@@ -156,6 +156,9 @@ def _render_sidebar(is_admin: bool):
         )
 
         for page, icon, description in NAV_ITEMS:
+            # Atalhos mantidos nas rotas, mas ocultos da navegação lateral.
+            if page in (PAGE_PROFILE, PAGE_ADMIN):
+                continue
             if page == PAGE_ADMIN and not is_admin:
                 continue
             if st.button(
