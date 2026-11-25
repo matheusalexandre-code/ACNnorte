@@ -20,75 +20,124 @@ PAGES = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def isolated_users(tmp_path, monkeypatch):
+    """Mantém os testes de interface isolados do cadastro local real."""
+    import src.auth_manager as auth
+
+    monkeypatch.setattr(auth, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(auth, "USERS_FILE", str(tmp_path / "users.json"))
+    monkeypatch.delenv(auth.ADMIN_ACCESS_CODE_ENV, raising=False)
+    auth.init_db()
+    yield
+
+
 def _authenticated_app():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.session_state["authenticated"] = True
-    app.session_state["username"] = "Ana.norte"
+    app.session_state["username"] = "Cláudio Norte"
+    app.session_state["user_id"] = "usr_claudio_norte"
+    app.session_state["user_role"] = "administrador"
     app.session_state["is_admin"] = True
+    app.session_state["admin_authorized"] = True
+    app.session_state["admin_authorized_at"] = "2026-11-24 22:00:00"
     return app
 
 
-def test_app_opens_directly_on_main_screen_without_login(monkeypatch):
-    monkeypatch.setenv("REQUIRE_AUTH", "false")
-    app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
-    app.run()
-    assert not app.exception, [error.value for error in app.exception]
-    assert app.session_state["authenticated"] is True
-    assert app.session_state["current_page"] == "Dashboard"
-    labels = [widget.label for widget in app.text_input]
-    assert "Senha" not in labels
-    assert "E-mail ou usuário" not in labels
-
-
-def test_login_screen_renders_when_auth_required(monkeypatch):
-    monkeypatch.setenv("REQUIRE_AUTH", "true")
+def test_login_screen_renders_passwordless_selection_with_official_logo():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.run()
     assert not app.exception, [error.value for error in app.exception]
     assert app.session_state["authenticated"] is False
+
     labels = [widget.label for widget in app.text_input]
-    assert "Senha" in labels
-    assert "E-mail ou usuário" in labels
+    assert "Pesquisar usuário" in labels
+    assert "Senha" not in labels
+    assert "E-mail ou usuário" not in labels
+    assert app.selectbox(key="login_user") is not None
+
+    markup = "\n".join(str(item.value) for item in app.markdown)
+    assert "data:image/jpeg;base64" in markup
 
 
-def test_login_blocks_empty_fields_when_auth_required(monkeypatch):
-    monkeypatch.setenv("REQUIRE_AUTH", "true")
+def test_login_blocks_empty_selection():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.run()
-    app.button[0].click()
+    app.button(key="login_submit").click()
     app.run()
     assert not app.exception, [error.value for error in app.exception]
-    assert any("Informe o e-mail" in str(getattr(err, "value", "")) for err in app.error)
+    assert any(
+        "Selecione seu nome" in str(getattr(err, "value", ""))
+        for err in app.error
+    )
 
 
-def test_login_with_email_calls_xano_login_flow(monkeypatch):
-    monkeypatch.setenv("REQUIRE_AUTH", "true")
-    import src.views.login_view as login_view
-    from src.modules.authentication.auth_service import XanoSession
-
-    called = {}
-
-    def fake_auth(email, password):
-        called["email"] = email
-        called["password"] = password
-        return XanoSession(
-            token="fake-jwt",
-            role="administrador",
-            user={"id": 1, "name": "Ana Norte", "email": email},
-        )
-
-    monkeypatch.setattr(login_view, "authenticate_with_xano", fake_auth)
-
+def test_common_user_logs_in_without_password():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.run()
-    app.text_input[0].input("ana@acnnorte.com.br")
-    app.text_input[1].input("senha123")
-    app.button[0].click()
+    app.selectbox(key="login_user").set_value("usr_ana_norte")
+    app.button(key="login_submit").click()
     app.run()
+
     assert not app.exception, [error.value for error in app.exception]
-    assert called.get("email") == "ana@acnnorte.com.br"
     assert app.session_state["authenticated"] is True
-    assert app.session_state["username"] == "Ana Norte"
+    assert app.session_state["username"] == "Ana.norte"
+    assert app.session_state["user_id"] == "usr_ana_norte"
+    assert app.session_state["is_admin"] is False
+    assert app.session_state["admin_authorized"] is False
+    assert app.session_state["current_page"] == "Dashboard"
+
+
+def test_admin_login_requires_server_side_authorization(monkeypatch):
+    monkeypatch.setenv("ACN_ADMIN_ACCESS_CODE", "segredo-adm")
+
+    app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    app.run()
+    app.selectbox(key="login_user").set_value("usr_claudio_norte")
+    app.run()
+
+    assert app.text_input(key="login_admin_code") is not None
+    app.text_input(key="login_admin_code").input("codigo-errado")
+    app.button(key="login_submit").click()
+    app.run()
+
+    assert app.session_state["authenticated"] is False
+    assert any(
+        "inválido" in str(getattr(err, "value", "")) for err in app.error
+    )
+
+
+def test_admin_login_with_valid_code_grants_admin_permission(monkeypatch):
+    monkeypatch.setenv("ACN_ADMIN_ACCESS_CODE", "segredo-adm")
+
+    app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    app.run()
+    app.selectbox(key="login_user").set_value("usr_claudio_norte")
+    app.run()
+    app.text_input(key="login_admin_code").input("segredo-adm")
+    app.button(key="login_submit").click()
+    app.run()
+
+    assert not app.exception, [error.value for error in app.exception]
+    assert app.session_state["authenticated"] is True
+    assert app.session_state["user_id"] == "usr_claudio_norte"
+    assert app.session_state["is_admin"] is True
+    assert app.session_state["admin_authorized"] is True
+
+
+def test_admin_login_is_blocked_when_server_secret_is_missing():
+    app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    app.run()
+    app.selectbox(key="login_user").set_value("usr_claudio_norte")
+    app.run()
+    app.button(key="login_submit").click()
+    app.run()
+
+    assert app.session_state["authenticated"] is False
+    assert any(
+        "não está configurada" in str(getattr(err, "value", ""))
+        for err in app.error
+    )
 
 
 @pytest.mark.parametrize("page", PAGES)

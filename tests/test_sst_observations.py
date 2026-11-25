@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
+import src.auth_manager as auth
 import src.export_manager as export_manager
 import src.storage_manager as storage
 import src.views.visits_view as visits_view
@@ -42,14 +43,29 @@ def isolated_storage(tmp_path, monkeypatch):
     """Redireciona JSON, fotos e exports para um diretório temporário."""
     data_dir = tmp_path / "data"
     exports_dir = data_dir / "exports"
+    auth_dir = tmp_path / "auth"
+    monkeypatch.setattr(auth, "DATA_DIR", str(auth_dir))
+    monkeypatch.setattr(auth, "USERS_FILE", str(auth_dir / "users.json"))
     monkeypatch.setattr(storage, "DATA_DIR", str(data_dir))
     monkeypatch.setattr(storage, "CLIENTS_FILE", str(data_dir / "clients.json"))
     monkeypatch.setattr(storage, "VISITS_FILE", str(data_dir / "visits.json"))
     monkeypatch.setattr(storage, "PHOTOS_DIR", str(data_dir / "photos"))
     monkeypatch.setattr(export_manager, "EXPORTS_DIR", str(exports_dir))
     monkeypatch.delenv("XANO_BASE_URL", raising=False)
+    auth.init_db()
     storage.init_storage()
     return tmp_path
+
+
+def _authenticated_app():
+    at = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    at.session_state["authenticated"] = True
+    at.session_state["username"] = "Ana.norte"
+    at.session_state["user_id"] = "usr_ana_norte"
+    at.session_state["user_role"] = "usuario"
+    at.session_state["is_admin"] = False
+    at.session_state["admin_authorized"] = False
+    return at
 
 
 def _create_client():
@@ -336,7 +352,7 @@ def test_xano_sync_sends_and_recovers_observations(isolated_storage, monkeypatch
 # ---------------------------------------------------------------------------
 def test_new_visit_form_has_14_independent_observation_fields(isolated_storage):
     _create_client()
-    at = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    at = _authenticated_app()
     at.session_state["current_page"] = "Nova Visita"
     at.session_state["visits_tab"] = "➕ Iniciar Visita"
     at.run()
@@ -376,7 +392,7 @@ def test_edit_flow_recovers_changes_and_preserves_other_topics(isolated_storage,
     answers = build_sst_answers("new", _sst_answers())
     _client_id, visit_id = _create_visit(observations=SAMPLE_OBSERVATIONS, answers=answers)
 
-    at = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
+    at = _authenticated_app()
     at.session_state["current_page"] = "Nova Visita"
     at.session_state["visits_tab"] = "✍️ Preencher Visita"
     at.session_state["active_visit_id"] = visit_id

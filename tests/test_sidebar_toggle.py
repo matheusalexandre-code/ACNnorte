@@ -12,11 +12,27 @@ from src.main import PAGE_CONFIG
 MAIN_SCRIPT = str(Path(__file__).resolve().parents[1] / "src" / "main.py")
 
 
+@pytest.fixture(autouse=True)
+def isolated_users(tmp_path, monkeypatch):
+    """Isola o cadastro local para as sessões administrativas dos testes."""
+    import src.auth_manager as auth
+
+    monkeypatch.setattr(auth, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(auth, "USERS_FILE", str(tmp_path / "users.json"))
+    monkeypatch.delenv(auth.ADMIN_ACCESS_CODE_ENV, raising=False)
+    auth.init_db()
+    yield
+
+
 def _authenticated_app():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.session_state["authenticated"] = True
-    app.session_state["username"] = "Ana.norte"
+    app.session_state["username"] = "Cláudio Norte"
+    app.session_state["user_id"] = "usr_claudio_norte"
+    app.session_state["user_role"] = "administrador"
     app.session_state["is_admin"] = True
+    app.session_state["admin_authorized"] = True
+    app.session_state["admin_authorized_at"] = "2026-11-24 22:00:00"
     return app
 
 
@@ -174,8 +190,7 @@ def test_toggle_is_available_on_every_page(page):
     assert app.button(key="sidebar_toggle").label == "☰ Menu"
 
 
-def test_login_screen_does_not_render_sidebar_toggle(monkeypatch):
-    monkeypatch.setenv("REQUIRE_AUTH", "true")
+def test_login_screen_does_not_render_sidebar_toggle():
     app = AppTest.from_file(MAIN_SCRIPT, default_timeout=60)
     app.run()
 

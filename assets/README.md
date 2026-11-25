@@ -25,12 +25,14 @@ assets/
 
 ## Logotipo oficial
 
-- `logo/acnnorte_logo.svg` — marca vetorial da ACNnorte (ACN em degradê azul,
-  C em verde com a cruz de Segurança do Trabalho vazada, "Norte" em grafite).
-- O logotipo é carregado por `render_acnnorte_logo(width=200)` em
-  `src/ui_components.py`, usada no menu lateral e na tela de login. Caso o
-  arquivo não esteja disponível, a função exibe um fallback textual com a paleta
-  institucional.
+- `logo/acnnorte_logo.svg` — marca vetorial usada no menu lateral e nas telas internas.
+- `images/logo_acnnorte.jpeg` — imagem original oficial (1600 × 405) usada na
+  tela de login. O arquivo é exibido sem recorte ou efeitos, com proporção
+  preservada por `object-fit: contain` e largura responsiva.
+- Ambos são carregados por `render_acnnorte_logo(...)` em `src/ui_components.py`.
+  A tela de login passa explicitamente `logo_path=LOGIN_LOGO_PATH`; as demais
+  telas continuam usando o SVG. Caso o arquivo não esteja disponível, a função
+  exibe um fallback textual com a paleta institucional.
 
 ## Observação
 

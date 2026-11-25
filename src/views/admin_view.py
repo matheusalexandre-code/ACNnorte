@@ -1,59 +1,116 @@
 import streamlit as st
-from src.auth_manager import load_users, add_user, toggle_user_status, delete_user, admin_reset_password
+
+from src.auth_manager import (
+    DEFAULT_USER_NAMES,
+    add_user,
+    admin_reset_password,
+    delete_user,
+    load_users,
+    session_user_is_admin,
+    toggle_user_status,
+)
 from src.storage_manager import load_visits, save_visits
 from src.ui_components import info_banner, record_sync, render_acnnorte_logo
 from src.xano_sync import pull_visits, sync_enabled
 
+
+def _admin_authorized() -> bool:
+    """Revalida o privilégio no cadastro persistido antes de cada operação."""
+    if not session_user_is_admin():
+        st.error(
+            "Acesso negado. Esta área é restrita a administradores autorizados "
+            "da ACNnorte."
+        )
+        return False
+    return True
+
+
 def render_admin_view():
-    is_admin = st.session_state.get("is_admin", False)
-    if not is_admin:
-        st.error("Acesso negado. Esta área é restrita a administradores autorizados da ACNnorte.")
+    if not _admin_authorized():
         return
-        
+
     render_acnnorte_logo(size="medium", subtitle="Gerenciamento Interno de Usuários")
     st.markdown("---")
-    
+
     tab1, tab2 = st.tabs(["📋 Lista de Usuários", "➕ Adicionar Novo Usuário"])
-    
+
     with tab1:
         st.markdown("#### Usuários Cadastrados no Sistema")
         users = load_users()
-        
+
         for username, data in users.items():
+            display_name = str(data.get("name") or username)
+            is_default_user = username in DEFAULT_USER_NAMES
             with st.container():
                 cols = st.columns([2, 1, 1, 1.5])
                 with cols[0]:
-                    st.markdown(f"**{username}**")
-                    role_badge = "👑 Administrador" if data.get("is_admin") else "👤 Usuário Padrão"
+                    st.markdown(f"**{display_name}**")
+                    role_badge = (
+                        "👑 Administrador"
+                        if data.get("is_admin")
+                        else "👤 Usuário Padrão"
+                    )
                     st.caption(role_badge)
+                    st.caption(f"ID interno: {data.get('user_id', 'N/D')}")
                 with cols[1]:
-                    status = "✅ Ativo" if data.get("active", True) else "❌ Desativado"
+                    status = (
+                        "✅ Ativo"
+                        if data.get("active", True)
+                        else "❌ Desativado"
+                    )
                     st.markdown(status)
                 with cols[2]:
-                    st.markdown(f"<small style='color: #4B5563;'>Criado em: {data.get('created_at', 'N/D')}</small>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<small style='color: #4B5563;'>Criado em: "
+                        f"{data.get('created_at', 'N/D')}</small>",
+                        unsafe_allow_html=True,
+                    )
                 with cols[3]:
-                    # Action buttons
                     col_act1, col_act2 = st.columns(2)
                     with col_act1:
-                        status_label = "Desativar" if data.get("active", True) else "Ativar"
-                        if st.button(status_label, key=f"toggle_{username}"):
-                            success, msg = toggle_user_status(username)
-                            if success:
-                                st.success(msg)
-                                st.rerun()
-                            else:
-                                st.error(msg)
-                    with col_act2:
-                        if username != "Ana.norte":
-                            if st.button("Remover", key=f"del_{username}", type="secondary"):
-                                st.session_state["user_delete_pending"] = username
-                        else:
+                        if is_default_user:
                             st.caption("Protegido")
+                        else:
+                            status_label = (
+                                "Desativar"
+                                if data.get("active", True)
+                                else "Ativar"
+                            )
+                            if st.button(
+                                status_label, key=f"toggle_{username}"
+                            ):
+                                if not _admin_authorized():
+                                    return
+                                success, msg = toggle_user_status(username)
+                                if success:
+                                    st.success(msg)
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+                    with col_act2:
+                        if is_default_user:
+                            st.caption("Protegido")
+                        elif st.button(
+                            "Remover",
+                            key=f"del_{username}",
+                            type="secondary",
+                        ):
+                            st.session_state["user_delete_pending"] = username
                 if st.session_state.get("user_delete_pending") == username:
-                    st.warning(f"Remover o usuário “{username}”? Ele perderá o acesso ao sistema.")
+                    st.warning(
+                        f"Remover o usuário “{display_name}”? Ele perderá o "
+                        "acesso ao sistema."
+                    )
                     confirm_col, cancel_col = st.columns(2)
                     with confirm_col:
-                        if st.button("Sim, remover", key=f"confirm_del_user_{username}", type="primary", width="stretch"):
+                        if st.button(
+                            "Sim, remover",
+                            key=f"confirm_del_user_{username}",
+                            type="primary",
+                            width="stretch",
+                        ):
+                            if not _admin_authorized():
+                                return
                             success, msg = delete_user(username)
                             st.session_state.pop("user_delete_pending", None)
                             if success:
@@ -62,23 +119,46 @@ def render_admin_view():
                             else:
                                 st.error(msg)
                     with cancel_col:
-                        if st.button("Cancelar", key=f"cancel_del_user_{username}", width="stretch"):
+                        if st.button(
+                            "Cancelar",
+                            key=f"cancel_del_user_{username}",
+                            width="stretch",
+                        ):
                             st.session_state.pop("user_delete_pending", None)
                             st.rerun()
-                st.markdown("<hr style='margin: 8px 0; border: none; border-top: 1px solid #E5E9EC;'>", unsafe_allow_html=True)
-                
-        # Password reset section by admin
-        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-        with st.expander("🔑 Redefinir Senha de Usuário (Administrativo)"):
-            reset_user = st.selectbox("Selecione o usuário", options=list(users.keys()), key="reset_user_select")
-            new_admin_pwd = st.text_input("Nova senha temporária", type="password", key="reset_pwd_input")
+                st.markdown(
+                    "<hr style='margin: 8px 0; border: none; "
+                    "border-top: 1px solid #E5E9EC;'>",
+                    unsafe_allow_html=True,
+                )
+
+        # Compatibilidade com contas legadas. O fluxo de login atual é por
+        # seleção de nome e não utiliza estas senhas.
+        st.markdown(
+            "<div style='height: 20px;'></div>", unsafe_allow_html=True
+        )
+        with st.expander("🔑 Redefinir Senha de Conta Legada (Administrativo)"):
+            reset_user = st.selectbox(
+                "Selecione o usuário",
+                options=list(users.keys()),
+                key="reset_user_select",
+            )
+            new_admin_pwd = st.text_input(
+                "Nova senha temporária", type="password", key="reset_pwd_input"
+            )
             if st.button("Aplicar Nova Senha"):
+                if not _admin_authorized():
+                    return
                 if not new_admin_pwd or len(new_admin_pwd) < 6:
                     st.error("A senha deve ter pelo menos 6 caracteres.")
                 else:
-                    success, msg = admin_reset_password(reset_user, new_admin_pwd)
+                    success, msg = admin_reset_password(
+                        reset_user, new_admin_pwd
+                    )
                     if success:
-                        st.success(f"Senha de {reset_user} atualizada com sucesso.")
+                        st.success(
+                            f"Senha de {reset_user} atualizada com sucesso."
+                        )
                     else:
                         st.error(msg)
 
@@ -89,21 +169,42 @@ def render_admin_view():
             token = st.session_state.get("xano_token")
             if not sync_enabled(token):
                 info_banner(
-                    "A recuperação fica disponível quando o Xano estiver configurado "
-                    "e a sessão administrativa estiver autenticada nesse serviço."
+                    "A recuperação fica disponível quando o Xano estiver "
+                    "configurado e a sessão administrativa estiver autenticada "
+                    "nesse serviço."
                 )
-            elif st.button("Buscar visitas remotas", key="xano_pull_preview", width="stretch"):
+            elif st.button(
+                "Buscar visitas remotas",
+                key="xano_pull_preview",
+                width="stretch",
+            ):
+                if not _admin_authorized():
+                    return
                 try:
-                    st.session_state["xano_remote_visits"] = pull_visits(token=token)
+                    st.session_state["xano_remote_visits"] = pull_visits(
+                        token=token
+                    )
                 except Exception:
-                    st.error("Não foi possível consultar as visitas do Xano. Tente novamente.")
+                    st.error(
+                        "Não foi possível consultar as visitas do Xano. "
+                        "Tente novamente."
+                    )
             remote_visits = st.session_state.get("xano_remote_visits")
             if remote_visits is not None:
                 if not remote_visits:
                     st.info("Nenhuma visita remota disponível para recuperação.")
                 else:
-                    st.caption(f"{len(remote_visits)} visita(s) encontrada(s) no Xano.")
-                    if st.button("Mesclar visitas ausentes", key="xano_pull_merge", type="primary", width="stretch"):
+                    st.caption(
+                        f"{len(remote_visits)} visita(s) encontrada(s) no Xano."
+                    )
+                    if st.button(
+                        "Mesclar visitas ausentes",
+                        key="xano_pull_merge",
+                        type="primary",
+                        width="stretch",
+                    ):
+                        if not _admin_authorized():
+                            return
                         try:
                             local = load_visits()
                             added = 0
@@ -116,31 +217,46 @@ def render_admin_view():
                                 save_visits(local)
                                 record_sync()
                         except Exception:
-                            st.error("Não foi possível salvar as visitas recuperadas. Tente novamente.")
+                            st.error(
+                                "Não foi possível salvar as visitas "
+                                "recuperadas. Tente novamente."
+                            )
                         else:
-                            st.success(f"{added} visita(s) recuperada(s) com sucesso.")
+                            st.success(
+                                f"{added} visita(s) recuperada(s) com sucesso."
+                            )
                             st.session_state.pop("xano_remote_visits", None)
                             st.rerun()
 
     with tab2:
         st.markdown("#### Cadastrar Novo Usuário")
-        info_banner("O cadastro de novos usuários é exclusivo para a área administrativa protegida da ACNnorte.")
-        
+        info_banner(
+            "O cadastro de novos usuários é exclusivo para o administrador "
+            "autorizado. Novos cadastros recebem perfil de Usuário Comum."
+        )
+
         with st.form("new_user_form"):
-            new_username = st.text_input("Nome de Usuário", placeholder="Ex: joao.norte")
-            new_password = st.text_input("Senha Inicial", type="password", placeholder="Mínimo de 6 caracteres")
-            is_new_admin = st.checkbox("Conceder privilégios de Administrador")
-            
+            new_username = st.text_input(
+                "Nome do Usuário", placeholder="Ex: joao.norte"
+            )
+            st.caption(
+                "Perfil do novo cadastro: 👤 Usuário Comum (sem privilégios ADM)."
+            )
+
             submit_new = st.form_submit_button("Cadastrar Usuário")
-            
+
             if submit_new:
-                if not new_username.strip() or not new_password.strip():
-                    st.error("Preencha todos os campos obrigatórios.")
-                elif len(new_password) < 6:
-                    st.error("A senha deve ter pelo menos 6 caracteres.")
+                if not _admin_authorized():
+                    return
+                if not new_username.strip():
+                    st.error("Informe o nome do usuário.")
                 else:
-                    success, msg = add_user(new_username.strip(), new_password, is_new_admin)
+                    success, msg = add_user(new_username.strip())
                     if success:
-                        st.success(f"Usuário '{new_username}' cadastrado com sucesso!")
+                        st.success(
+                            f"Usuário '{new_username.strip()}' cadastrado com "
+                            "sucesso como Usuário Comum."
+                        )
+                        st.rerun()
                     else:
                         st.error(msg)

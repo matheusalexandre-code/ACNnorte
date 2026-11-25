@@ -30,6 +30,10 @@ from src.ui.theme.colors import (  # noqa: E402
 # Logotipo oficial (assets/logo/acnnorte_logo.svg)
 # ---------------------------------------------------------------------------
 LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "logo" / "acnnorte_logo.svg"
+# Logo oficial fornecida para a tela de login (arquivo original, 1600x405).
+LOGIN_LOGO_PATH = (
+    Path(__file__).resolve().parent.parent / "assets" / "images" / "logo_acnnorte.jpeg"
+)
 LOGO_VIEWBOX_WIDTH = 520
 LOGO_VIEWBOX_HEIGHT = 210
 
@@ -163,21 +167,33 @@ def record_sync():
 
 
 @st.cache_data(show_spinner=False)
-def _read_logo_svg(path: str, modified_at: float):
-    """Lê o conteúdo do SVG oficial (com cache invalidado pela data de modificação)."""
+def _read_logo_bytes(path: str, modified_at: float):
+    """Lê o arquivo do logotipo, com cache invalidado pela data de modificação."""
     try:
-        return Path(path).read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return None
-
-
-def _load_acnnorte_logo():
-    """Carrega o arquivo do logotipo, retornando None quando indisponível."""
-    try:
-        modified_at = LOGO_PATH.stat().st_mtime
+        return Path(path).read_bytes()
     except OSError:
         return None
-    return _read_logo_svg(str(LOGO_PATH), modified_at)
+
+
+def _logo_mime_type(path: Path) -> str:
+    return {
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+    }.get(path.suffix.lower(), "application/octet-stream")
+
+
+def _load_acnnorte_logo(path: Path = LOGO_PATH):
+    """Carrega o logotipo e seu MIME, retornando None quando indisponível."""
+    try:
+        modified_at = path.stat().st_mtime
+    except OSError:
+        return None
+    content = _read_logo_bytes(str(path), modified_at)
+    if not content:
+        return None
+    return content, _logo_mime_type(path)
 
 
 def render_acnnorte_logo(
@@ -185,14 +201,16 @@ def render_acnnorte_logo(
     subtitle: str = None,
     align: str = "center",
     size: str = None,
+    logo_path: str | Path | None = None,
 ):
-    """Exibe o logotipo vetorial oficial da ACNnorte com fallback seguro.
+    """Exibe o logotipo oficial da ACNnorte com fallback seguro.
 
     Args:
         width: largura em pixels do logotipo (padrão 200).
         subtitle: texto opcional exibido abaixo da marca.
         align: alinhamento horizontal ("left", "center" ou "right").
         size: presets legados ("small", "normal", "medium", "large").
+        logo_path: arquivo alternativo (a tela de login usa o JPEG original).
     """
     # Compatibilidade com a API anterior: render_acnnorte_logo("large")
     if isinstance(width, str):
@@ -207,14 +225,18 @@ def render_acnnorte_logo(
 
     align_css = align if align in {"left", "center", "right"} else "center"
 
-    svg = _load_acnnorte_logo()
-    if svg:
-        # Renderiza como imagem (data URI) para evitar exibição do código SVG como texto.
-        encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    path = Path(logo_path) if logo_path else LOGO_PATH
+    loaded = _load_acnnorte_logo(path)
+    if loaded:
+        content, mime_type = loaded
+        # Renderiza a imagem original como data URI, preservando proporção e
+        # composição (sem recorte, alongamento, filtros ou efeitos).
+        encoded = base64.b64encode(content).decode("ascii")
         markup = (
-            f'<img src="data:image/svg+xml;base64,{encoded}" '
+            f'<img src="data:{mime_type};base64,{encoded}" '
             f'alt="ACNnorte" width="{width}" '
-            f'style="width:{width}px;max-width:100%;height:auto;display:inline-block;" />'
+            f'style="width:{width}px;max-width:100%;height:auto;'
+            f'object-fit:contain;display:inline-block;vertical-align:middle;" />'
         )
     else:
         # Fallback seguro: marca textual com a paleta institucional.

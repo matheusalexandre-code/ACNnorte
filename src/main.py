@@ -1,5 +1,4 @@
 import html
-import os
 import sys
 from pathlib import Path
 
@@ -14,7 +13,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 import streamlit as st
 
-from src.auth_manager import init_db
+from src.auth_manager import get_active_user_by_id, init_db, session_user_is_admin
 from src.features import initialize_features
 from src.storage_manager import StorageError, init_storage
 from src.ui_components import (
@@ -71,12 +70,24 @@ PAGE_RENDERERS = {
 SESSION_KEYS = (
     "authenticated",
     "username",
+    "user_id",
+    "user_role",
     "is_admin",
+    "admin_authorized",
+    "admin_authorized_at",
     "auth_source",
     "xano_token",
     "xano_user",
     "user_email",
     "current_page",
+    "active_visit_id",
+    "visits_tab",
+    "clients_tab",
+    "xano_remote_visits",
+    "xano_smoke_result",
+    "login_search",
+    "login_user",
+    "login_admin_code",
 )
 
 # Configuração única do Streamlit. O menu inicia expandido conforme a
@@ -88,17 +99,6 @@ PAGE_CONFIG = {
     "layout": "wide",
     "initial_sidebar_state": "expanded",
 }
-
-
-def is_auth_required() -> bool:
-    """Verifica se a autenticação por senha é obrigatória.
-
-    Por padrão (CHANGE 01), a autenticação não é obrigatória para agilizar
-    o acesso dos técnicos em campo à tela principal e aos formulários.
-    Caso o sistema seja publicado na internet, a variável REQUIRE_AUTH=true
-    pode ser definida no arquivo .env para reativar o bloqueio por senha.
-    """
-    return os.getenv("REQUIRE_AUTH", "false").strip().lower() in ("true", "1", "yes")
 
 
 def _render_xano_smoke_test() -> None:
@@ -156,8 +156,10 @@ def _render_sidebar(is_admin: bool):
         )
 
         for page, icon, description in NAV_ITEMS:
-            # Atalhos mantidos nas rotas, mas ocultos da navegação lateral.
-            if page in (PAGE_PROFILE, PAGE_ADMIN):
+            # "Alterar Senha" permanece como rota interna, mas fora do menu.
+            # "Gerenciar Usuários" é exibido somente ao ADM autorizado no
+            # servidor, pois o cadastro de usuários faz parte deste fluxo.
+            if page == PAGE_PROFILE:
                 continue
             if page == PAGE_ADMIN and not is_admin:
                 continue
@@ -199,16 +201,13 @@ def _render_sidebar(is_admin: bool):
         _render_xano_smoke_test()
         render_sync_indicator()
 
-        if is_auth_required():
-            if st.button("🚪 Sair", key="logout", width="stretch"):
-                for key in SESSION_KEYS:
-                    st.session_state.pop(key, None)
-                st.rerun()
-        else:
-            if st.button("🔄 Reiniciar Tela", key="reset_screen", width="stretch", help="Retorna ao Dashboard"):
-                st.session_state["current_page"] = PAGE_DASHBOARD
-                st.session_state["active_visit_id"] = None
-                st.rerun()
+        if st.button("🚪 Sair", key="logout", width="stretch"):
+            # Encerra a identificação, a autorização administrativa e os
+            # resíduos da sessão; o próximo acesso volta à tela de login.
+            for key in SESSION_KEYS:
+                st.session_state.pop(key, None)
+            st.session_state["current_page"] = PAGE_DASHBOARD
+            st.rerun()
 
 
 def main():
@@ -232,15 +231,7 @@ def main():
     # Intenção do usuário para o menu lateral; nunca é sobrescrita em reruns.
     st.session_state.setdefault(SIDEBAR_OPEN_KEY, True)
 
-    # CHANGE 01 — Acesso direto à tela principal do sistema (sem tela de login prévia)
-    if not is_auth_required():
-        default_user = os.getenv("DEFAULT_USERNAME", "Ana.norte")
-        st.session_state.setdefault("authenticated", True)
-        st.session_state.setdefault("username", default_user)
-        st.session_state.setdefault("is_admin", True)
-        st.session_state.setdefault("current_page", PAGE_DASHBOARD)
-    else:
-        st.session_state.setdefault("authenticated", False)
+    st.session_state.setdefault("authenticated", False)
 
     apply_pending_state()
 
@@ -250,7 +241,23 @@ def main():
         render_login_view()
         return
 
-    is_admin = st.session_state.get("is_admin", False)
+    # Revalida a identificação no cadastro real a cada execução. Sessões de
+    # usuários removidos ou desativados voltam imediatamente para o login.
+    active_record = get_active_user_by_id(
+        str(st.session_state.get("user_id") or "")
+    )
+    if not isinstance(active_record, dict):
+        for key in SESSION_KEYS:
+            st.session_state.pop(key, None)
+        st.session_state["current_page"] = PAGE_DASHBOARD
+        render_login_view()
+        return
+
+    st.session_state["username"] = str(
+        active_record.get("name") or st.session_state.get("username") or "Usuário"
+    )
+    is_admin = session_user_is_admin()
+    st.session_state["is_admin"] = is_admin
     current_page = st.session_state.get("current_page", PAGE_DASHBOARD)
     if current_page == PAGE_ADMIN and not is_admin:
         current_page = PAGE_DASHBOARD
