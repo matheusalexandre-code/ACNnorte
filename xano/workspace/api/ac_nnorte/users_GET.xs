@@ -1,7 +1,7 @@
 query "users" verb=GET {
   api_group = "ACNnorte"
   description = "Lista usuários. Apenas administradores."
-  auth = "user"
+  auth = "users"
 
   input {
     text search?
@@ -27,7 +27,7 @@ query "users" verb=GET {
     }
 
     db.query users {
-      where = ($input.search == null || $db.users.name ilike "%" ~ $input.search ~ "%" || $db.users.email ilike "%" ~ $input.search ~ "%") && ($input.status == null || $db.users.status == $input.status) && ($input.role == null || $db.users.role == $input.role)
+      where = ($input.status == null || $db.users.status == $input.status) && ($input.role == null || $db.users.role == $input.role)
       sort = {created_at: "desc"}
       return = {
         type: "list"

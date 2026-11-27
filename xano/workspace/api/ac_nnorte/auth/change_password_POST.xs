@@ -1,7 +1,7 @@
 query "auth/change-password" verb=POST {
   api_group = "ACNnorte"
   description = "Altera a senha do usuário autenticado."
-  auth = "user"
+  auth = "users"
 
   input {
     text current_password

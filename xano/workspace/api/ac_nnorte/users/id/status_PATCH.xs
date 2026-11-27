@@ -1,7 +1,7 @@
 query "users/{id}/status" verb=PATCH {
   api_group = "ACNnorte"
   description = "Ativa ou bloqueia um usuário. Apenas administradores."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

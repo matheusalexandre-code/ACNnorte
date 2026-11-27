@@ -1,7 +1,7 @@
 query "clients/{id}" verb=PATCH {
   api_group = "ACNnorte"
   description = "Atualiza os dados cadastrais de um cliente."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

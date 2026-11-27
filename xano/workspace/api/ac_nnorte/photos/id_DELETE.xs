@@ -1,7 +1,7 @@
 query "photos/{id}" verb=DELETE {
   api_group = "ACNnorte"
   description = "Remove a fotografia do banco e do storage, preservando a visita."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

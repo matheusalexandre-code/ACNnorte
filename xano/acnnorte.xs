@@ -175,7 +175,7 @@ query "auth/login" verb=POST {
 query "auth/me" verb=GET {
   api_group = "ACNnorte"
   description = "Retorna o perfil do usuário autenticado."
-  auth = "user"
+  auth = "users"
 
   input {
   }
@@ -199,7 +199,7 @@ query "auth/me" verb=GET {
 query "auth/signup" verb=POST {
   api_group = "ACNnorte"
   description = "Cria um novo usuário. Apenas administradores podem chamar este endpoint."
-  auth = "user"
+  auth = "users"
 
   input {
     text name filters=trim
@@ -255,7 +255,7 @@ query "auth/signup" verb=POST {
 query "auth/change-password" verb=POST {
   api_group = "ACNnorte"
   description = "Altera a senha do usuário autenticado."
-  auth = "user"
+  auth = "users"
 
   input {
     text current_password
@@ -299,7 +299,7 @@ query "auth/change-password" verb=POST {
 query "users" verb=GET {
   api_group = "ACNnorte"
   description = "Lista usuários. Apenas administradores."
-  auth = "user"
+  auth = "users"
 
   input {
     text search?
@@ -325,7 +325,7 @@ query "users" verb=GET {
     }
 
     db.query users {
-      where = ($input.search == null || $db.users.name ilike "%" ~ $input.search ~ "%" || $db.users.email ilike "%" ~ $input.search ~ "%") && ($input.status == null || $db.users.status == $input.status) && ($input.role == null || $db.users.role == $input.role)
+      where = ($input.status == null || $db.users.status == $input.status) && ($input.role == null || $db.users.role == $input.role)
       sort = {created_at: "desc"}
       return = {
         type: "list"
@@ -346,7 +346,7 @@ query "users" verb=GET {
 query "users/{id}/status" verb=PATCH {
   api_group = "ACNnorte"
   description = "Ativa ou bloqueia um usuário. Apenas administradores."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -400,7 +400,7 @@ query "users/{id}/status" verb=PATCH {
 query "clients" verb=GET {
   api_group = "ACNnorte"
   description = "Lista clientes ativos com filtros opcionais por nome ou CNPJ."
-  auth = "user"
+  auth = "users"
 
   input {
     text name?
@@ -411,7 +411,7 @@ query "clients" verb=GET {
 
   stack {
     db.query clients {
-      where = $db.clients.active == true && ($input.name == null || $db.clients.name ilike "%" ~ $input.name ~ "%") && ($input.cnpj == null || $db.clients.cnpj ilike "%" ~ $input.cnpj ~ "%")
+      where = $db.clients.active == true
       sort = {name: "asc"}
       return = {
         type: "list"
@@ -431,7 +431,7 @@ query "clients" verb=GET {
 query "clients" verb=POST {
   api_group = "ACNnorte"
   description = "Cadastra um cliente. Valida se o CNPJ já existe."
-  auth = "user"
+  auth = "users"
 
   input {
     text name filters=trim
@@ -472,7 +472,7 @@ query "clients" verb=POST {
 query "clients/{id}" verb=GET {
   api_group = "ACNnorte"
   description = "Retorna os dados do cliente e o histórico de visitas vinculadas."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -505,7 +505,7 @@ query "clients/{id}" verb=GET {
 query "clients/{id}" verb=PATCH {
   api_group = "ACNnorte"
   description = "Atualiza os dados cadastrais de um cliente."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -612,7 +612,7 @@ query "clients/{id}" verb=PATCH {
 query "clients/{id}" verb=DELETE {
   api_group = "ACNnorte"
   description = "Desativa um cliente (active = false), preservando as visitas."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -646,7 +646,7 @@ query "clients/{id}" verb=DELETE {
 query "visits" verb=GET {
   api_group = "ACNnorte"
   description = "Lista visitas com filtros opcionais por status, cliente, inspetor e intervalo de datas."
-  auth = "user"
+  auth = "users"
 
   input {
     enum status? {
@@ -682,7 +682,7 @@ query "visits" verb=GET {
 query "visits/{id}" verb=GET {
   api_group = "ACNnorte"
   description = "Retorna uma visita com cliente, inspetor e fotografias."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -728,7 +728,7 @@ query "visits/{id}" verb=GET {
 query "visits" verb=POST {
   api_group = "ACNnorte"
   description = "Inicia um novo rascunho de visita técnica."
-  auth = "user"
+  auth = "users"
 
   input {
     int client_id
@@ -798,7 +798,7 @@ query "visits" verb=POST {
 query "visits/{id}" verb=PATCH {
   api_group = "ACNnorte"
   description = "Salva o progresso da visita e atualiza updated_at (autosave)."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -914,7 +914,7 @@ query "visits/{id}" verb=PATCH {
 query "visits/{id}/finalize" verb=POST {
   api_group = "ACNnorte"
   description = "Valida os campos obrigatórios e altera o status para finalizado."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -986,7 +986,7 @@ query "visits/{id}/finalize" verb=POST {
 query "photos" verb=GET {
   api_group = "ACNnorte"
   description = "Lista as fotografias de uma visita."
-  auth = "user"
+  auth = "users"
 
   input {
     int visit_id
@@ -1016,7 +1016,7 @@ query "photos" verb=GET {
 query "photos" verb=POST {
   api_group = "ACNnorte"
   description = "Faz upload de uma imagem vinculada a uma visita."
-  auth = "user"
+  auth = "users"
 
   input {
     int visit_id
@@ -1064,7 +1064,7 @@ query "photos" verb=POST {
 query "photos/{id}" verb=PATCH {
   api_group = "ACNnorte"
   description = "Atualiza a legenda, a ordem ou substitui o arquivo de uma fotografia."
-  auth = "user"
+  auth = "users"
 
   input {
     int id
@@ -1152,7 +1152,7 @@ query "photos/{id}" verb=PATCH {
 query "photos/{id}" verb=DELETE {
   api_group = "ACNnorte"
   description = "Remove a fotografia do banco e do storage, preservando a visita."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

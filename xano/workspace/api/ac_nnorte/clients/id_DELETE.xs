@@ -1,7 +1,7 @@
 query "clients/{id}" verb=DELETE {
   api_group = "ACNnorte"
   description = "Desativa um cliente (active = false), preservando as visitas."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

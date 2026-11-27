@@ -1,7 +1,7 @@
 query "visits/{id}/finalize" verb=POST {
   api_group = "ACNnorte"
   description = "Valida os campos obrigatórios e altera o status para finalizado."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

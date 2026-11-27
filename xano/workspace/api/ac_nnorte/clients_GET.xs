@@ -1,7 +1,7 @@
 query "clients" verb=GET {
   api_group = "ACNnorte"
   description = "Lista clientes ativos com filtros opcionais por nome ou CNPJ."
-  auth = "user"
+  auth = "users"
 
   input {
     text name?
@@ -12,7 +12,7 @@ query "clients" verb=GET {
 
   stack {
     db.query clients {
-      where = $db.clients.active == true && ($input.name == null || $db.clients.name ilike "%" ~ $input.name ~ "%") && ($input.cnpj == null || $db.clients.cnpj ilike "%" ~ $input.cnpj ~ "%")
+      where = $db.clients.active == true
       sort = {name: "asc"}
       return = {
         type: "list"

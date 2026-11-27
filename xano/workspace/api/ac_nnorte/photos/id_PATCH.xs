@@ -1,7 +1,7 @@
 query "photos/{id}" verb=PATCH {
   api_group = "ACNnorte"
   description = "Atualiza a legenda, a ordem ou substitui o arquivo de uma fotografia."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

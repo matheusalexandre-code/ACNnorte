@@ -1,7 +1,7 @@
 query "auth/signup" verb=POST {
   api_group = "ACNnorte"
   description = "Cria um novo usuário. Apenas administradores podem chamar este endpoint."
-  auth = "user"
+  auth = "users"
 
   input {
     text name filters=trim

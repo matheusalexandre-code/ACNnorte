@@ -50,3 +50,7 @@ storage/exports/*
 !storage/photos/.gitkeep
 !storage/reports/.gitkeep
 !storage/exports/.gitkeep
+
+xano_etapa1/
+xano_etapa2/
+preview_xano.txt

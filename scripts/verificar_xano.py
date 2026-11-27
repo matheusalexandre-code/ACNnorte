@@ -173,6 +173,9 @@ def verificar_escrita(client) -> None:
         return
     try:
         lido = client.get(f"/clients/{remote_id}")
+        # O endpoint devolve {"client": {...}, "visits": [...]}.
+        if isinstance(lido, dict) and isinstance(lido.get("client"), dict):
+            lido = lido["client"]
         registrar("GET /clients/{id}", OK if isinstance(lido, dict) and lido.get("cnpj") == cnpj else FALHA,
                   "registro lido de volta com o mesmo CNPJ")
     except XanoError as exc:

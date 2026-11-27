@@ -1,7 +1,7 @@
 query "photos" verb=POST {
   api_group = "ACNnorte"
   description = "Faz upload de uma imagem vinculada a uma visita."
-  auth = "user"
+  auth = "users"
 
   input {
     int visit_id

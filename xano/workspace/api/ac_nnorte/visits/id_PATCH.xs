@@ -1,7 +1,7 @@
 query "visits/{id}" verb=PATCH {
   api_group = "ACNnorte"
   description = "Salva o progresso da visita e atualiza updated_at (autosave)."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

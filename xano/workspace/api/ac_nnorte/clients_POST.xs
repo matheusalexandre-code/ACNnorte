@@ -1,7 +1,7 @@
 query "clients" verb=POST {
   api_group = "ACNnorte"
   description = "Cadastra um cliente. Valida se o CNPJ já existe."
-  auth = "user"
+  auth = "users"
 
   input {
     text name filters=trim

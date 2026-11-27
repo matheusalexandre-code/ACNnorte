@@ -1,7 +1,7 @@
 query "auth/me" verb=GET {
   api_group = "ACNnorte"
   description = "Retorna o perfil do usuário autenticado."
-  auth = "user"
+  auth = "users"
 
   input {
   }

@@ -1,7 +1,7 @@
 query "visits" verb=GET {
   api_group = "ACNnorte"
   description = "Lista visitas com filtros opcionais por status, cliente, inspetor e intervalo de datas."
-  auth = "user"
+  auth = "users"
 
   input {
     enum status? {

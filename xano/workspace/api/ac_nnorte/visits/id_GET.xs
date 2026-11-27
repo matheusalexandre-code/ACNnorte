@@ -1,7 +1,7 @@
 query "visits/{id}" verb=GET {
   api_group = "ACNnorte"
   description = "Retorna uma visita com cliente, inspetor e fotografias."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

@@ -1,7 +1,7 @@
 query "clients/{id}" verb=GET {
   api_group = "ACNnorte"
   description = "Retorna os dados do cliente e o histórico de visitas vinculadas."
-  auth = "user"
+  auth = "users"
 
   input {
     int id

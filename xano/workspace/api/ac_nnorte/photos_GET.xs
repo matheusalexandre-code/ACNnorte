@@ -1,7 +1,7 @@
 query "photos" verb=GET {
   api_group = "ACNnorte"
   description = "Lista as fotografias de uma visita."
-  auth = "user"
+  auth = "users"
 
   input {
     int visit_id

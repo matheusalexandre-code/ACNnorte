@@ -1,7 +1,7 @@
 query "visits" verb=POST {
   api_group = "ACNnorte"
   description = "Inicia um novo rascunho de visita técnica."
-  auth = "user"
+  auth = "users"
 
   input {
     int client_id
