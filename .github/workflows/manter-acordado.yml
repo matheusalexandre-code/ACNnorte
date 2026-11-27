@@ -1,0 +1,3 @@
+git add .github/workflows/manter-acordado.yml
+git commit -m "ci: mantém o app do Streamlit acordado"
+git push origin main
