@@ -42,6 +42,7 @@ _CSS = """
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 #sig-status { font-size: 0.78rem; color: #000000; }
 .acn-sign-actions { display: flex; gap: 6px; }
@@ -51,15 +52,17 @@ _CSS = """
   border: 1px solid #D1D5DB;
   border-radius: 8px;
   padding: 6px 10px;
-  font-size: 0.78rem;
+  min-height: 44px;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+  touch-action: manipulation;
 }
 .acn-sign-actions button:hover { background: #E5E7EB; }
 .acn-sign-canvas-wrap {
   position: relative;
   width: 100%;
-  height: 180px;
+  height: 220px;
   background: #FFFFFF;
   border: 1px dashed #9CA3AF;
   border-radius: 10px;
@@ -82,6 +85,17 @@ _CSS = """
   font-size: 0.9rem;
   pointer-events: none;
   user-select: none;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .acn-sign-canvas-wrap { height: 260px; }
+  .acn-sign-actions button { min-height: 48px; padding: 8px 14px; }
+}
+@media (max-width: 480px) {
+  .acn-sign { padding: 8px; }
+  .acn-sign-canvas-wrap { height: 240px; }
+  .acn-sign-actions { width: 100%; }
+  .acn-sign-actions button { flex: 1 1 0; }
 }
 """
 

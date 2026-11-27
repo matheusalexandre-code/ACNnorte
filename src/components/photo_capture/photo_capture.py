@@ -635,10 +635,19 @@ _CSS = """
   background: #F4F6F4;
 }
 
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .acn-tab { min-height: 52px; }
+  .acn-camera-toolbar select { min-height: 48px; flex: 1 1 100%; }
+  .acn-btn { min-height: 52px; flex: 1 1 140px; }
+  #pc-video, #pc-snapshot { max-height: 300px; }
+  #pc-preview { max-height: 280px; }
+}
 @media (max-width: 420px) {
   .acn-photo { padding: 10px; border-radius: 12px; }
   .acn-tabs { flex-direction: column; }
   .acn-btn { flex: 1 1 100%; }
+  #pc-video, #pc-snapshot { max-height: 240px; }
+  #pc-preview { max-height: 220px; }
 }
 """
 

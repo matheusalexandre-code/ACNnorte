@@ -52,17 +52,31 @@ _GLOBAL_CSS = Template(
 /* --------------------------------------------------------------------------
    Base e layout
    -------------------------------------------------------------------------- */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
 html, body {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    max-width: 100%;
 }
 .stApp {
     background-color: $BG_MAIN;
     color: $TEXT_PRIMARY;
+    max-width: 100%;
+    overflow-x: clip;
 }
 .block-container {
     padding-top: 2rem;
     padding-bottom: 3rem;
     max-width: 1180px;
+    max-width: min(1180px, 100%);
+}
+/* Nenhuma mídia deve ultrapassar a largura disponível (fotos, logo, ícones). */
+img, svg, video, canvas {
+    max-width: 100%;
+}
+p, li, label {
+    overflow-wrap: anywhere;
 }
 h1, h2, h3, h4 {
     font-weight: 700;
@@ -495,6 +509,13 @@ label,
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 .stTextArea textarea { min-height: 110px; }
+/* Tabelas mantêm todos os dados; a rolagem horizontal fica restrita ao grid. */
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+    max-width: 100%;
+    overflow-x: auto;
+}
+.acn-photo-card img { max-width: 100%; height: auto; }
 
 [data-testid="stMetric"] {
     background: $BG_FIELD;
@@ -579,14 +600,55 @@ label,
 
 /* --------------------------------------------------------------------------
    Responsividade
+
+   O Streamlit já empilha colunas nativamente abaixo de 640 px. Estas regras
+   complementam o comportamento natural nos breakpoints intermediários (onde
+   três ou quatro colunas ficariam comprimidas) e garantem que nenhuma coluna
+   ultrapasse a largura da tela. Nenhum campo é removido: apenas a disposição
+   muda.
    -------------------------------------------------------------------------- */
 @media (max-width: 1024px) {
     .block-container { padding-left: 1.2rem; padding-right: 1.2rem; }
+    [data-testid="stDataFrame"] { font-size: 0.88rem; }
+}
+@media (min-width: 641px) and (max-width: 1100px) {
+    /* Quatro colunas: duas por linha em tablets e notebooks compactos. */
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)):not(:has(> [data-testid="stColumn"]:nth-child(5))) > [data-testid="stColumn"] {
+        flex-basis: calc(50% - 16px) !important;
+    }
+    /* Colunas aninhadas (ex.: ações dentro de um cartão) ficam verticais. */
+    [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        flex-basis: 100% !important;
+    }
+}
+@media (min-width: 641px) and (max-width: 1023px) {
+    /* Três colunas: duas por linha; a terceira ocupa a linha seguinte. */
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3)):not(:has(> [data-testid="stColumn"]:nth-child(4))) > [data-testid="stColumn"] {
+        flex-basis: calc(50% - 16px) !important;
+    }
+}
+@media (min-width: 641px) and (max-width: 767px) {
+    /* Tablet vertical / telas intermediárias: formulários em uma coluna. */
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(3)):not(:has(> [data-testid="stColumn"]:nth-child(5))) > [data-testid="stColumn"] {
+        flex-basis: 100% !important;
+    }
+}
+@media (max-width: 640px) {
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        flex-basis: 100% !important;
+        max-width: 100% !important;
+    }
+    .acn-badge { white-space: normal !important; }
+    [data-baseweb="tab-list"] { flex-wrap: wrap; }
+    [data-baseweb="tab"] { flex: 1 1 auto; min-width: 110px; }
 }
 @media (max-width: 768px) {
     .block-container {
         padding: 1rem 0.75rem 2.5rem 0.75rem;
         max-width: 100%;
+    }
+    [data-testid="stSidebar"] {
+        max-width: min(88vw, 380px) !important;
     }
     h1 { font-size: 1.55rem !important; }
     h2 { font-size: 1.3rem !important; }
@@ -601,6 +663,17 @@ label,
     [data-testid="stForm"] { padding: 0.9rem 0.75rem; }
     .acn-section-title { font-size: 1.05rem; }
     .acn-user-card { font-size: 0.85rem; }
+    [data-baseweb="select"] > div { min-height: 46px; }
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stTimeInput"] input { min-height: 46px; }
+}
+@media (max-width: 480px) {
+    .block-container { padding: 0.85rem 0.6rem 2rem 0.6rem; }
+    h1 { font-size: 1.42rem !important; }
+    .acn-banner { padding: 9px 10px; font-size: 0.86rem; }
+    .acn-activity { padding: 9px 10px; font-size: 0.86rem; }
 }
 @media (hover: none) and (pointer: coarse) {
     .stButton > button,

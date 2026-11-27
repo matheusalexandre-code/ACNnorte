@@ -82,3 +82,38 @@ def test_theme_is_applied_through_single_entry_point():
     # apply_global_styles continua existindo para compatibilidade e delega ao tema.
     assert callable(ui_components.apply_global_styles)
     assert callable(ui_components.inject_sidebar_css)
+
+
+def test_global_css_has_responsive_breakpoints_and_overflow_guard():
+    css = get_global_css()
+
+    for breakpoint in (
+        "@media (max-width: 1024px)",
+        "@media (max-width: 768px)",
+        "@media (max-width: 640px)",
+        "@media (max-width: 480px)",
+    ):
+        assert breakpoint in css
+
+    assert 'data-testid="stHorizontalBlock"' in css
+    assert "overflow-x: clip" in css
+    assert "max-width: min(1180px, 100%)" in css
+    assert '[data-testid="stDataFrame"]' in css
+
+
+def test_signature_pad_css_is_touch_friendly():
+    from src import signature_pad
+
+    assert "height: 220px" in signature_pad._CSS
+    assert "height: 260px" in signature_pad._CSS
+    assert "min-height: 44px" in signature_pad._CSS
+    assert "touch-action: none" in signature_pad._CSS
+
+
+def test_photo_capture_css_has_tablet_and_touch_breakpoints():
+    from src.components.photo_capture import photo_capture
+
+    assert "@media (max-width: 768px)" in photo_capture._CSS
+    assert "@media (max-width: 420px)" in photo_capture._CSS
+    assert "min-height: 52px" in photo_capture._CSS
+    assert "min-height: 48px" in photo_capture._CSS
