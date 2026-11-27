@@ -26,10 +26,12 @@ import json
 import os
 import re
 import tempfile
+import threading
+import time
 from datetime import datetime
 from typing import Any, Callable, Iterable, Mapping
 
-from src.core.database.xano_client import XanoClient, XanoError
+from src.core.database.xano_client import XanoClient, XanoError, _load_env_file
 
 EXT_KEY = "_acn_ext_v1"
 OBS_KEY = "_acn_obs"
@@ -88,6 +90,113 @@ def _session_token() -> str:
         return ""
 
 
+# ---------------------------------------------------------------------------
+# Conta de serviço
+# ---------------------------------------------------------------------------
+# O login do aplicativo é feito apenas pela seleção do nome, sem senha, e por
+# isso nenhum token do Xano é obtido por usuário. Para que a sincronização
+# funcione, o aplicativo se autentica no Xano com uma conta de serviço,
+# configurada em ``XANO_SERVICE_EMAIL`` e ``XANO_SERVICE_PASSWORD`` (arquivo
+# ``.env`` ou secrets do Streamlit Cloud). O token (válido por 24 h no Xano) é
+# guardado em memória e renovado automaticamente antes de expirar ou após um
+# erro 401. ``XANO_AUTH_TOKEN`` continua aceito como token fixo de reserva.
+
+SERVICE_TOKEN_TTL_SECONDS = 20 * 60 * 60  # renova antes das 24 h do Xano
+_SECRET_KEYS = (
+    "XANO_BASE_URL",
+    "XANO_AUTH_TOKEN",
+    "XANO_SERVICE_EMAIL",
+    "XANO_SERVICE_PASSWORD",
+)
+_service_cache: dict[str, Any] = {"token": "", "user_id": None, "expires_at": 0.0}
+_service_lock = threading.Lock()
+
+
+def _load_streamlit_secrets() -> None:
+    """Carrega o ``.env`` e copia as chaves do Xano de ``st.secrets``, se faltarem."""
+    try:
+        _load_env_file()
+    except Exception:
+        pass
+    try:
+        import streamlit as st  # type: ignore
+
+        for key in _SECRET_KEYS:
+            if os.getenv(key):
+                continue
+            try:
+                value = st.secrets.get(key)
+            except Exception:
+                return  # sem arquivo de secrets: nada a carregar
+            if value:
+                os.environ[key] = str(value)
+    except Exception:
+        return
+
+
+def _service_credentials() -> tuple[str, str]:
+    _load_streamlit_secrets()
+    email = (os.getenv("XANO_SERVICE_EMAIL", "") or "").strip().lower()
+    password = os.getenv("XANO_SERVICE_PASSWORD", "") or ""
+    return email, password
+
+
+def service_account_configured() -> bool:
+    """Indica se há conta de serviço ou token fixo configurado no ambiente."""
+    email, password = _service_credentials()
+    static_token = (os.getenv("XANO_AUTH_TOKEN", "") or "").strip()
+    return bool((email and password) or static_token)
+
+
+def invalidate_service_token() -> None:
+    """Descarta o token de serviço em cache (usado após um 401)."""
+    with _service_lock:
+        _service_cache.update({"token": "", "user_id": None, "expires_at": 0.0})
+
+
+def _service_token(force_refresh: bool = False) -> str:
+    """Token da conta de serviço, com login automático e cache em memória."""
+    email, password = _service_credentials()
+    if not (email and password):
+        return (os.getenv("XANO_AUTH_TOKEN", "") or "").strip()
+
+    with _service_lock:
+        now = time.time()
+        if (
+            not force_refresh
+            and _service_cache["token"]
+            and now < float(_service_cache["expires_at"])
+        ):
+            return str(_service_cache["token"])
+        try:
+            with XanoClient(token="") as client:
+                data = client.post("/auth/login", {"email": email, "password": password})
+        except Exception as exc:
+            _log(f"falha no login da conta de serviço do Xano: {exc}")
+            return (os.getenv("XANO_AUTH_TOKEN", "") or "").strip()
+
+        token = data.get("authToken") if isinstance(data, Mapping) else None
+        if not isinstance(token, str) or not token.strip():
+            _log("login da conta de serviço não retornou authToken")
+            return (os.getenv("XANO_AUTH_TOKEN", "") or "").strip()
+
+        user = data.get("user") if isinstance(data.get("user"), Mapping) else {}
+        user_id = user.get("id") if isinstance(user, Mapping) else None
+        _service_cache.update(
+            {
+                "token": token.strip(),
+                "user_id": int(user_id) if user_id is not None else None,
+                "expires_at": now + SERVICE_TOKEN_TTL_SECONDS,
+            }
+        )
+        return str(_service_cache["token"])
+
+
+def _resolve_token(token: str | None = None) -> str:
+    """Prioridade: token explícito > token da sessão > conta de serviço."""
+    return (token or _session_token() or _service_token() or "").strip()
+
+
 def _session_user_id() -> int | None:
     try:
         import streamlit as st  # type: ignore
@@ -96,20 +205,33 @@ def _session_user_id() -> int | None:
         if isinstance(user, Mapping) and user.get("id") is not None:
             return int(user["id"])
     except Exception:
-        return None
-    return None
+        pass
+    # Sem login por usuário no Xano, a visita é registrada pela conta de serviço.
+    user_id = _service_cache.get("user_id")
+    return int(user_id) if user_id is not None else None
 
 
 def sync_enabled(token: str | None = None) -> bool:
-    """Indica se há configuração mínima para sincronizar com o Xano."""
+    """Indica se há configuração mínima para sincronizar com o Xano.
+
+    Não faz chamadas HTTP: basta haver URL e algum meio de autenticação
+    (token explícito, token da sessão ou conta de serviço configurada).
+    """
+    _load_streamlit_secrets()
     base_url = (os.getenv("XANO_BASE_URL", "") or "").strip()
-    resolved = (token or _session_token() or "").strip()
-    return bool(base_url and resolved)
+    has_auth = bool((token or "").strip() or _session_token() or service_account_configured())
+    return bool(base_url and has_auth)
 
 
 def _client(token: str | None = None) -> XanoClient:
-    resolved = (token or _session_token() or "").strip() or None
+    resolved = _resolve_token(token) or None
     return XanoClient(token=resolved)
+
+
+def _handle_auth_error(exc: Exception) -> None:
+    """Após um 401, força novo login da conta de serviço na próxima chamada."""
+    if isinstance(exc, XanoError) and exc.status_code == 401:
+        invalidate_service_token()
 
 
 def _safe_json_loads(value: Any) -> Any:
@@ -397,6 +519,7 @@ def sync_client(local_client: dict, client: XanoClient | None = None, token: str
             local_client["xano_id"] = int(remote["id"])
             local_client["xano_synced_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as exc:
+        _handle_auth_error(exc)
         _log(f"falha ao sincronizar cliente {local_client.get('id')}: {exc}")
     finally:
         if owns:
@@ -563,6 +686,7 @@ def sync_visit(local_visit: dict, client: XanoClient | None = None, token: str |
         # Sincroniza fotografias vinculadas.
         sync_visit_photos(local_visit, client=client)
     except Exception as exc:
+        _handle_auth_error(exc)
         _log(f"falha ao sincronizar visita {local_visit.get('id')}: {exc}")
     finally:
         if owns:
@@ -1002,6 +1126,8 @@ __all__ = [
     "pull_visits",
     "sync_client",
     "sync_enabled",
+    "service_account_configured",
+    "invalidate_service_token",
     "sync_visit",
     "test_persistence",
 ]

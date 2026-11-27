@@ -47,8 +47,12 @@ visitas e fotografias.
 - Referência da API: `xano/api.md`
 - Integração com o Streamlit: `xano/integracao.md`
 
-A aplicação continua usando `data/*.json` até que a camada de persistência seja
-migrada para a API.
+A aplicação grava em `data/*.json` e sincroniza clientes, visitas e fotos com o
+Xano quando `XANO_BASE_URL` e a conta de serviço (`XANO_SERVICE_EMAIL` e
+`XANO_SERVICE_PASSWORD`) estão configuradas no `.env` ou nos secrets do Streamlit
+Cloud. Como o login é só pelo nome, é essa conta que autentica o app no Xano; o
+token é renovado automaticamente. Sem essa configuração, o app funciona só no
+modo local. Para conferir o vínculo: `python scripts/verificar_xano.py`.
 
 ## 📋 Pré-requisitos
 
@@ -59,8 +63,8 @@ migrada para a API.
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/mathalx/Projeto-2.0.git
-cd Projeto-2.0
+git clone https://github.com/matheusalexandre-code/ACNnorte.git
+cd ACNnorte
 ```
 
 2. Crie e ative um ambiente virtual:
