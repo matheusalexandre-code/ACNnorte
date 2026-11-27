@@ -25,14 +25,19 @@ assets/
 
 ## Logotipo oficial
 
-- `logo/acnnorte_logo.svg` — marca vetorial usada no menu lateral e nas telas internas.
-- `images/logo_acnnorte.jpeg` — imagem original oficial (1600 × 405) usada na
-  tela de login. O arquivo é exibido sem recorte ou efeitos, com proporção
-  preservada por `object-fit: contain` e largura responsiva.
-- Ambos são carregados por `render_acnnorte_logo(...)` em `src/ui_components.py`.
-  A tela de login passa explicitamente `logo_path=LOGIN_LOGO_PATH`; as demais
-  telas continuam usando o SVG. Caso o arquivo não esteja disponível, a função
-  exibe um fallback textual com a paleta institucional.
+- `images/logo_acnnorte.jpeg` — imagem original oficial (1600 × 405, RGB, MD5
+  `c08f849aa93e09496c5f452f151ff365`). É usada no menu lateral, no topo do
+  dashboard, nas demais telas internas e no login. O arquivo é exibido sem
+  recorte, filtros ou efeitos, com proporção preservada por `object-fit: contain`
+  e largura responsiva; o fundo branco do JPEG é apresentado como um cartão
+  discreto sobre o fundo `#F3F4F6` do aplicativo.
+- `logo/acnnorte_logo.svg` — redesenho vetorial antigo, mantido no repositório,
+  mas atualmente sem uso pela aplicação.
+- Ambos os caminhos são carregados por `render_acnnorte_logo(...)` em
+  `src/ui_components.py`. A tela de login passa explicitamente
+  `logo_path=LOGIN_LOGO_PATH`; as demais telas usam `LOGO_PATH`. Caso o arquivo
+  não esteja disponível, a função exibe um fallback textual com a paleta
+  institucional.
 
 ## Observação
 

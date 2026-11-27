@@ -27,15 +27,15 @@ from src.ui.theme.colors import (  # noqa: E402
 )
 
 # ---------------------------------------------------------------------------
-# Logotipo oficial (assets/logo/acnnorte_logo.svg)
+# Logotipo oficial (assets/images/logo_acnnorte.jpeg - JPEG original 1600x405, RGB)
 # ---------------------------------------------------------------------------
-LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "logo" / "acnnorte_logo.svg"
-# Logo oficial fornecida para a tela de login (arquivo original, 1600x405).
+LOGO_PATH = (
+    Path(__file__).resolve().parent.parent / "assets" / "images" / "logo_acnnorte.jpeg"
+)
+# A tela de login continua usando explicitamente o mesmo arquivo oficial.
 LOGIN_LOGO_PATH = (
     Path(__file__).resolve().parent.parent / "assets" / "images" / "logo_acnnorte.jpeg"
 )
-LOGO_VIEWBOX_WIDTH = 520
-LOGO_VIEWBOX_HEIGHT = 210
 
 # Larguras sugeridas para manter compatibilidade com a API antiga (size=...).
 LOGO_WIDTH_PRESETS = {
@@ -210,7 +210,7 @@ def render_acnnorte_logo(
         subtitle: texto opcional exibido abaixo da marca.
         align: alinhamento horizontal ("left", "center" ou "right").
         size: presets legados ("small", "normal", "medium", "large").
-        logo_path: arquivo alternativo (a tela de login usa o JPEG original).
+        logo_path: arquivo alternativo (padrão: JPEG oficial em LOGO_PATH).
     """
     # Compatibilidade com a API anterior: render_acnnorte_logo("large")
     if isinstance(width, str):
@@ -232,11 +232,20 @@ def render_acnnorte_logo(
         # Renderiza a imagem original como data URI, preservando proporção e
         # composição (sem recorte, alongamento, filtros ou efeitos).
         encoded = base64.b64encode(content).decode("ascii")
+        # O JPEG oficial tem fundo branco; sobre o fundo #F3F4F6 do app, o
+        # retângulo é apresentado como um cartão discreto e intencional.
+        # Nenhum filtro ou mix-blend-mode é aplicado à imagem original.
+        card_style = (
+            "display:inline-block;background:#FFFFFF;border-radius:10px;"
+            "padding:6px 8px;line-height:0;box-sizing:border-box;max-width:100%;"
+        )
         markup = (
+            f'<span style="{card_style}">'
             f'<img src="data:{mime_type};base64,{encoded}" '
             f'alt="ACNnorte" width="{width}" '
             f'style="width:{width}px;max-width:100%;height:auto;'
-            f'object-fit:contain;display:inline-block;vertical-align:middle;" />'
+            f'object-fit:contain;display:block;" />'
+            f'</span>'
         )
     else:
         # Fallback seguro: marca textual com a paleta institucional.
